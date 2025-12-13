@@ -1,7 +1,7 @@
 [project]
 name = "ais"
 version = "0.1.0"
-description = "Add your description here"
+description = "Dutch Geospatial Data Integration with AI Agent"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -11,4 +11,5 @@ dependencies = [
     "rdflib==7.0.0",
     "urllib3==1.26.15",
     "requests==2.31.0",
+    "openai>=1.0.0",
 ]

@@ -10,6 +10,8 @@ import docker
 import json
 import time
 import sys
+import os
+from pathlib import Path
 
 app = Flask(__name__)
 CORS(app)
@@ -29,6 +31,23 @@ logger = logging.getLogger(__name__)
 # Docker client
 docker_client = docker.from_env()
 
+# Load environment variables from .env file
+def load_env_file(env_path):
+    """Load environment variables from .env file"""
+    env_vars = {}
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    env_vars[key.strip()] = value.strip()
+    return env_vars
+
+# Load .env file from project root
+env_file_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+ENV_VARS = load_env_file(env_file_path)
+
 # Service definitions
 SERVICES = {
     "kadaster-service": {
@@ -40,7 +59,7 @@ SERVICES = {
         "container_name": "eai-kadaster-service",
         "status": "stopped",
         "rdf_entities": ["Property", "Location"],
-        "position": {"x": 100, "y": 100}
+        "position": {"x": 50, "y": 50}
     },
     "cbs-service": {
         "name": "cbs-service",
@@ -51,7 +70,7 @@ SERVICES = {
         "container_name": "eai-cbs-service",
         "status": "stopped",
         "rdf_entities": ["Municipality", "Statistics"],
-        "position": {"x": 350, "y": 100}
+        "position": {"x": 300, "y": 50}
     },
     "rijkswaterstaat-service": {
         "name": "rijkswaterstaat-service",
@@ -62,7 +81,19 @@ SERVICES = {
         "container_name": "eai-rijkswaterstaat-service",
         "status": "stopped",
         "rdf_entities": ["Infrastructure", "WaterBody", "Road"],
-        "position": {"x": 600, "y": 100}
+        "position": {"x": 550, "y": 50}
+    },
+    "agent-service": {
+        "name": "agent-service",
+        "display_name": "AI Agent",
+        "description": "Intelligent agent (queries all services)",
+        "image": "eai-agent-service",
+        "build_path": "../mcp-servers/agent-service",
+        "container_name": "eai-agent-service",
+        "status": "stopped",
+        "rdf_entities": ["Agent"],
+        "position": {"x": 300, "y": 300},
+        "is_agent": True  # Mark this as special
     }
 }
 
@@ -223,12 +254,16 @@ def start_service(service_name):
                 )
             
             # Create and start container
+            # Pass environment variables to agent service
+            container_env = ENV_VARS if service.get("is_agent") else None
+
             container = docker_client.containers.run(
                 service["image"],
                 name=service["container_name"],
                 detach=True,
                 stdin_open=True,
-                tty=False
+                tty=False,
+                environment=container_env
             )
         
         # Wait a moment for container to start

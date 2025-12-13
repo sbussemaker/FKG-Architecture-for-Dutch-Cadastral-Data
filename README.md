@@ -78,6 +78,24 @@ All three services contain data about the same three locations:
 - **CBS**: Population 651,446, 342,847 households, avg income €31,900
 - **Rijkswaterstaat**: Erasmusbrug (bridge), Nieuwe Maas river, A15 highway
 
+## 🤖 AI Agent
+
+The system includes an **intelligent AI agent** powered by Azure OpenAI that can answer natural language questions by querying multiple MCP services.
+
+**How it works:**
+1. You ask a question in plain English
+2. The agent determines which services to query
+3. It gathers data from Kadaster, CBS, and/or Rijkswaterstaat
+4. It synthesizes the information into a comprehensive answer
+
+**Example questions:**
+- "What is the population of Amsterdam?"
+- "Compare the infrastructure in Utrecht and Rotterdam"
+- "Tell me about the property and demographics in Amsterdam"
+- "Which city has the highest population density?"
+
+See [AI-AGENT.md](AI-AGENT.md) for detailed documentation.
+
 ## MCP Services
 
 ### 1. Kadaster Service (Dutch Land Registry)
@@ -164,7 +182,26 @@ ais/
 
 ## Setup Instructions
 
-### 1. Start the Orchestrator
+### 1. Install Dependencies
+
+```bash
+# Install dependencies including the AI agent
+uv sync
+```
+
+### 2. Configure Azure OpenAI (for AI Agent)
+
+To enable the AI agent feature, configure your Azure OpenAI credentials in the `.env` file:
+
+```bash
+# Edit the .env file in the project root
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=your-api-key-here
+AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
+AZURE_OPENAI_API_VERSION=2024-12-01-preview
+```
+
+### 3. Start the Orchestrator
 
 The orchestrator automatically builds Docker images on startup:
 
@@ -174,11 +211,12 @@ python orchestrator.py
 ```
 
 The orchestrator will:
-- Build all three MCP server images
+- Build all MCP server images (including agent service)
 - Start Flask API on port 5000
+- Load Azure OpenAI credentials from `.env` file
 - Enable logging to `/tmp/orchestrator.log`
 
-### 2. Open the Dashboard
+### 4. Open the Dashboard
 
 ```bash
 # Option 1: Direct file access
@@ -191,7 +229,7 @@ python -m http.server 8080
 
 Navigate to `http://localhost:8080`
 
-### 3. Start Services
+### 5. Start Services
 
 From the dashboard:
 1. Click "Start" on each service box (Kadaster, CBS, Rijkswaterstaat)
@@ -199,6 +237,28 @@ From the dashboard:
 3. Connection lines will become active when all services are running
 
 ## Usage Examples
+
+### Using the AI Agent
+
+The easiest way to explore the data is using the AI agent:
+
+**Via Dashboard:**
+1. Find the "🤖 AI Agent" panel at the top right
+2. Type your question
+3. Click "Ask AI Agent"
+4. Get a synthesized answer from multiple sources
+
+**Via API:**
+```bash
+curl -X POST http://localhost:5000/api/agent/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is the population of Utrecht?"}'
+```
+
+**Test script:**
+```bash
+python test_agent.py
+```
 
 ### Cross-Agency Data Integration
 
@@ -306,6 +366,7 @@ The Netherlands uses:
 - **POST /api/services/:name/start**: Start a service container
 - **POST /api/services/:name/stop**: Stop a service container
 - **POST /api/query**: Execute MCP queries across services
+- **POST /api/agent/ask**: Ask the AI agent a natural language question
 - **GET /api/ontology**: Get the geospatial ontology in Turtle format
 
 ## Extending the Demo
@@ -343,6 +404,7 @@ This demo demonstrates:
 5. ✅ **Enterprise Architecture**: ArchiMate modeling and visualization
 6. ✅ **RESTful Orchestration**: API-based service coordination
 7. ✅ **Data Integration**: Combining complementary data from multiple authoritative sources
+8. ✅ **AI-Powered Integration**: LLM agent that intelligently queries and synthesizes data
 
 ## Troubleshooting
 

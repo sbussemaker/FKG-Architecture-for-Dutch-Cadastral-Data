@@ -90,6 +90,18 @@
             background: #c6f6d5;
             border-color: #38a169;
         }
+
+        .service-box.agent {
+            background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%);
+            border-color: #f59e0b;
+            border-width: 3px;
+        }
+
+        .service-box.agent.running {
+            background: linear-gradient(135deg, #d1fae5 0%, #6ee7b7 100%);
+            border-color: #059669;
+            border-width: 3px;
+        }
         
         .service-header {
             display: flex;
@@ -319,7 +331,7 @@
             
             <div class="side-panel">
                 <div class="panel">
-                    <div class="panel-title">🔍 Query Services (MCP Client)</div>
+                    <div class="panel-title">🔍 Query Services (MCP Protocol)</div>
                     <div class="query-builder">
                         <select id="service-select">
                             <option value="">Select a service...</option>
@@ -327,7 +339,7 @@
                         <select id="tool-select">
                             <option value="">Select a tool...</option>
                         </select>
-                        <input type="text" id="args-input" placeholder='Arguments (JSON): {"location_id": "LOC001"}'>
+                        <textarea id="args-input" placeholder='Arguments (JSON): {"location_id": "LOC001"} or {"question": "What is the population?"}' style="width: 100%; min-height: 50px; padding: 8px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 13px; font-family: inherit; resize: vertical;"></textarea>
                         <button class="btn-query" onclick="executeQuery()">Execute Query</button>
                     </div>
                     <div id="results" class="results"></div>
@@ -380,6 +392,9 @@
                 {name: 'list_roads', args: {}},
                 {name: 'get_infrastructure', args: {location_id: 'LOC001'}},
                 {name: 'get_water_level', args: {location_id: 'LOC001'}}
+            ],
+            'agent-service': [
+                {name: 'ask_question', args: {question: 'What is the population of Amsterdam?'}}
             ]
         };
         
@@ -397,34 +412,36 @@
         function renderServices() {
             const container = document.getElementById('services');
             container.innerHTML = '';
-            
+
             services.forEach(service => {
                 const box = document.createElement('div');
-                box.className = `service-box ${service.status === 'running' ? 'running' : ''}`;
+                const isAgent = service.is_agent || false;
+                box.className = `service-box ${service.status === 'running' ? 'running' : ''} ${isAgent ? 'agent' : ''}`;
                 box.style.left = `${service.position.x}px`;
                 box.style.top = `${service.position.y}px`;
-                
+
                 const entities = service.rdf_entities.join(', ');
-                
+                const icon = isAgent ? '🤖' : service.display_name[0];
+
                 box.innerHTML = `
                     <div class="service-header">
-                        <div class="service-icon">${service.display_name[0]}</div>
+                        <div class="service-icon" style="${isAgent ? 'font-size: 18px;' : ''}">${icon}</div>
                         <div class="service-name">${service.display_name}</div>
                     </div>
                     <div class="service-description">${service.description}</div>
-                    <div class="service-entities">RDF: ${entities}</div>
+                    <div class="service-entities">${isAgent ? 'Type: MCP Meta-Agent' : 'RDF: ' + entities}</div>
                     <div class="service-status ${service.status}">${service.status}</div>
                     <div class="service-controls">
-                        <button class="btn btn-start" onclick="startService('${service.name}')" 
+                        <button class="btn btn-start" onclick="startService('${service.name}')"
                                 ${service.status === 'running' ? 'disabled' : ''}>Start</button>
                         <button class="btn btn-stop" onclick="stopService('${service.name}')"
                                 ${service.status !== 'running' ? 'disabled' : ''}>Stop</button>
                     </div>
                 `;
-                
+
                 container.appendChild(box);
             });
-            
+
             drawConnections();
         }
         
@@ -433,40 +450,57 @@
             document.querySelectorAll('.connection-line').forEach(line => line.remove());
 
             const container = document.getElementById('services');
-            const boxes = document.querySelectorAll('.service-box');
+            const containerRect = container.getBoundingClientRect();
 
-            if (boxes.length >= 2) {
-                const containerRect = container.getBoundingClientRect();
-                const running = services.every(s => s.status === 'running');
+            // Find the agent service and data services
+            let agentService = null;
+            let dataServices = [];
 
-                // Draw connections between consecutive services
-                for (let i = 0; i < boxes.length - 1; i++) {
-                    const box1 = boxes[i].getBoundingClientRect();
-                    const box2 = boxes[i + 1].getBoundingClientRect();
-
-                    const x1 = box1.right - containerRect.left;
-                    const y1 = box1.top + box1.height / 2 - containerRect.top;
-                    const x2 = box2.left - containerRect.left;
-                    const y2 = box2.top + box2.height / 2 - containerRect.top;
-
-                    const line = document.createElement('div');
-                    line.className = 'connection-line';
-
-                    if (running) {
-                        line.classList.add('active');
-                    }
-
-                    const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-                    const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
-
-                    line.style.width = `${length}px`;
-                    line.style.left = `${x1}px`;
-                    line.style.top = `${y1}px`;
-                    line.style.transform = `rotate(${angle}deg)`;
-
-                    container.appendChild(line);
+            services.forEach((service, index) => {
+                if (service.is_agent) {
+                    agentService = {service, index};
+                } else {
+                    dataServices.push({service, index});
                 }
+            });
+
+            if (!agentService || dataServices.length === 0) {
+                return;
             }
+
+            const boxes = document.querySelectorAll('.service-box');
+            const agentBox = boxes[agentService.index];
+
+            // Draw lines from each data service to the agent
+            dataServices.forEach(({service, index}) => {
+                const dataBox = boxes[index];
+                const dataBounds = dataBox.getBoundingClientRect();
+                const agentBounds = agentBox.getBoundingClientRect();
+
+                // Calculate connection points (bottom of data service to top of agent)
+                const x1 = dataBounds.left + dataBounds.width / 2 - containerRect.left;
+                const y1 = dataBounds.bottom - containerRect.top;
+                const x2 = agentBounds.left + agentBounds.width / 2 - containerRect.left;
+                const y2 = agentBounds.top - containerRect.top;
+
+                const line = document.createElement('div');
+                line.className = 'connection-line';
+
+                // Line is active if both services are running
+                if (service.status === 'running' && agentService.service.status === 'running') {
+                    line.classList.add('active');
+                }
+
+                const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+
+                line.style.width = `${length}px`;
+                line.style.left = `${x1}px`;
+                line.style.top = `${y1}px`;
+                line.style.transform = `rotate(${angle}deg)`;
+
+                container.appendChild(line);
+            });
         }
         
         async function startService(serviceName) {
@@ -547,6 +581,43 @@
             }
         });
         
+        async function askAgent() {
+            const question = document.getElementById('agent-question').value;
+
+            if (!question.trim()) {
+                alert('Please enter a question');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('agent-results');
+            resultsDiv.innerHTML = '<div style="color: #666; padding: 10px;">🤔 AI Agent is thinking...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/agent/ask`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    resultsDiv.innerHTML = `<div style="color: red; padding: 10px;">❌ Error: ${data.error}</div>`;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="result-item" style="background: #f0f9ff; border-left: 4px solid #0284c7;">
+                            <strong style="color: #0369a1;">Question:</strong>
+                            <div style="margin: 8px 0; font-style: italic;">${data.question}</div>
+                            <strong style="color: #0369a1;">Answer:</strong>
+                            <div style="margin-top: 8px; line-height: 1.6; white-space: pre-wrap;">${data.answer}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div style="color: red; padding: 10px;">❌ Error: ${error.message}</div>`;
+            }
+        }
+
         async function executeQuery() {
             const service = document.getElementById('service-select').value;
             const tool = document.getElementById('tool-select').value;

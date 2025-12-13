@@ -20,6 +20,26 @@ services:
     tty: false
     restart: unless-stopped
 
+  agent-service:
+    build: ./mcp-servers/agent-service
+    container_name: eai-agent-service
+    stdin_open: true
+    tty: false
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - kadaster-service
+      - cbs-service
+      - rijkswaterstaat-service
+
   orchestrator:
     build:
       context: ./client

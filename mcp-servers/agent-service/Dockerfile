@@ -2,8 +2,8 @@ FROM python:3.14-slim
 
 WORKDIR /app
 
-# Install rdflib
-RUN pip install --no-cache-dir rdflib
+# Install dependencies
+RUN pip install --no-cache-dir openai rdflib
 
 # Copy server script
 COPY server.py .
