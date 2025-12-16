@@ -16,22 +16,9 @@ from pathlib import Path
 app = Flask(__name__)
 CORS(app)
 
-# Enable logging to file and stdout
-import logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler('/tmp/orchestrator.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# Docker client
-docker_client = docker.from_env()
-
 # Load environment variables from .env file
+import logging
+
 def load_env_file(env_path):
     """Load environment variables from .env file"""
     env_vars = {}
@@ -47,6 +34,26 @@ def load_env_file(env_path):
 # Load .env file from project root
 env_file_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 ENV_VARS = load_env_file(env_file_path)
+
+# Configure logging based on LOG_LEVEL from .env
+LOG_LEVEL = ENV_VARS.get("LOG_LEVEL", "DEBUG").upper()
+log_level = getattr(logging, LOG_LEVEL, logging.INFO)
+
+logging.basicConfig(
+    level=log_level,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler('/tmp/orchestrator.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Reduce Flask/werkzeug logging noise (only show warnings and errors)
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+
+# Docker client
+docker_client = docker.from_env()
 
 # Service definitions
 SERVICES = {
@@ -113,6 +120,59 @@ def update_service_status():
     except Exception as e:
         logger.error(f"Error updating status: {e}")
 
+def read_docker_stream(socket, stream_type_filter=None):
+    """
+    Read from Docker multiplexed stream
+
+    Args:
+        socket: Docker socket
+        stream_type_filter: If specified, only return data from this stream (1=stdout, 2=stderr)
+
+    Returns:
+        Decoded string data from the specified stream type
+    """
+    result = b""
+    stderr_logs = []
+
+    while True:
+        # Read Docker multiplexing header (8 bytes)
+        header = socket._sock.recv(8)
+        if len(header) < 8:
+            break
+
+        stream_type = header[0]
+        # Size is in bytes 4-8 (big-endian uint32)
+        size = int.from_bytes(header[4:8], byteorder='big')
+
+        # Read the payload
+        payload = b""
+        while len(payload) < size:
+            chunk = socket._sock.recv(size - len(payload))
+            if not chunk:
+                break
+            payload += chunk
+
+        if stream_type == 0x02:  # stderr
+            # Log stderr messages
+            try:
+                stderr_msg = payload.decode('utf-8', errors='replace').strip()
+                if stderr_msg:
+                    stderr_logs.append(stderr_msg)
+                    logger.info(f"[Agent stderr] {stderr_msg}")
+            except Exception as e:
+                logger.warning(f"Error decoding stderr: {e}")
+        elif stream_type == 0x01:  # stdout
+            result += payload
+            # Check if we have a complete JSON-RPC message (ends with newline)
+            if payload.endswith(b'\n'):
+                break
+
+    # Log any collected stderr at the end
+    if stderr_logs:
+        logger.debug(f"Collected {len(stderr_logs)} stderr messages from agent")
+
+    return result.decode('utf-8', errors='replace').strip()
+
 def call_mcp_tool(container_name, tool_name, arguments={}):
     """Call an MCP tool in a running container"""
     try:
@@ -136,28 +196,18 @@ def call_mcp_tool(container_name, tool_name, arguments={}):
             f"python -u server.py",
             stdin=True,
             stdout=True,
-            stderr=False,  # Disable stderr to prevent mixing with JSON responses
+            stderr=True,  # Capture stderr for logging
             detach=False,
             tty=False,
             socket=True
         )
-        
+
         socket = exec_result.output
         socket._sock.sendall(init_request.encode())
-        
+
         # Read initialization response
-        response_line = b""
-        while True:
-            chunk = socket._sock.recv(1)
-            if not chunk or chunk == b"\n":
-                break
-            response_line += chunk
-
-        # Strip Docker multiplexing header (8 bytes) if present
-        if len(response_line) > 8 and response_line[0] in (0x01, 0x02):
-            response_line = response_line[8:]
-
-        logger.info(f"Init response: {response_line.decode('utf-8', errors='replace')[:200]}")
+        init_response = read_docker_stream(socket)
+        logger.info(f"Init response: {init_response[:200]}")
 
         # Call the tool
         tool_request = json.dumps({
@@ -173,38 +223,10 @@ def call_mcp_tool(container_name, tool_name, arguments={}):
         socket._sock.sendall(tool_request.encode())
 
         # Read tool response
-        response_line = b""
-        while True:
-            chunk = socket._sock.recv(1)
-            if not chunk or chunk == b"\n":
-                break
-            response_line += chunk
-
+        decoded_response = read_docker_stream(socket)
         socket._sock.close()
 
-        logger.info(f"Tool response raw bytes (first 50): {response_line[:50]}")
-
-        # Strip Docker multiplexing header (8 bytes) if present
-        # Docker prepends: [stream_type (1 byte)][padding (3 bytes)][size (4 bytes)]
-        if len(response_line) > 8 and response_line[0] in (0x01, 0x02):
-            logger.info("Stripping Docker multiplexing header")
-            response_line = response_line[8:]
-
-        logger.info(f"After header strip (first 50): {response_line[:50]}")
-
-        # Decode with error handling for invalid UTF-8 bytes
-        try:
-            decoded_response = response_line.decode('utf-8')
-        except UnicodeDecodeError as e:
-            # Try with error handling
-            decoded_response = response_line.decode('utf-8', errors='replace')
-            logger.warning(f"Invalid UTF-8 in response: {e}")
-            logger.warning(f"Raw bytes (first 100): {response_line[:100]}")
-
-        # Strip whitespace
-        decoded_response = decoded_response.strip()
-
-        logger.info(f"Tool response decoded (first 200 chars): {decoded_response[:200]}")
+        logger.info(f"Tool response (first 200 chars): {decoded_response[:200]}")
 
         try:
             result = json.loads(decoded_response)
@@ -247,7 +269,7 @@ def start_service(service_name):
             try:
                 docker_client.images.get(service["image"])
             except docker.errors.ImageNotFound:
-                print(f"Building image {service['image']}...")
+                logger.info(f"Building image {service['image']}...")
                 docker_client.images.build(
                     path=service["build_path"],
                     tag=service["image"]
@@ -257,13 +279,17 @@ def start_service(service_name):
             # Pass environment variables to agent service
             container_env = ENV_VARS if service.get("is_agent") else None
 
+            # Mount Docker socket for agent service (needs to exec into other containers)
+            volumes = {'/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'rw'}} if service.get("is_agent") else None
+
             container = docker_client.containers.run(
                 service["image"],
                 name=service["container_name"],
                 detach=True,
                 stdin_open=True,
                 tty=False,
-                environment=container_env
+                environment=container_env,
+                volumes=volumes
             )
         
         # Wait a moment for container to start
@@ -310,6 +336,7 @@ def query_services():
             continue
         
         service = SERVICES[service_name]
+        logger.info(f"Make call to {service}")
         result = call_mcp_tool(service["container_name"], tool_name, arguments)
         results.append({
             "service": service_name,
@@ -346,4 +373,8 @@ if __name__ == '__main__':
 
     update_service_status()
     logger.info("Starting Flask server on port 5000...")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    logger.info(f"Log level set to: {LOG_LEVEL}")
+
+    # Set Flask debug mode based on log level
+    debug_mode = (LOG_LEVEL == "DEBUG")
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
