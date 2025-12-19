@@ -6,8 +6,9 @@ Statistics Netherlands - Demographic and statistical data
 
 import json
 import sys
-from rdflib import Graph, Namespace, Literal, URIRef
-from rdflib.namespace import RDF, RDFS, XSD
+
+from rdflib import Graph, Literal, Namespace, URIRef
+from rdflib.namespace import RDF, XSD
 
 # Define namespace
 GEO = Namespace("http://example.org/geospatial#")
@@ -16,10 +17,12 @@ GEO = Namespace("http://example.org/geospatial#")
 graph = Graph()
 graph.bind("geo", GEO)
 
+
 # Add sample CBS data (statistical and demographic information)
 def init_data():
     statistics = [
-        # (locationId, municipality, population, households, avgIncome, popDensity, unemploymentRate)
+        # (locationId, municipality, population, households, avgIncome,
+        #  popDensity, unemploymentRate)
         ("LOC001", "Amsterdam", 872680, 465242, 38500.0, 5135.0, 5.2),
         ("LOC002", "Utrecht", 361966, 183149, 35200.0, 3426.0, 4.8),
         ("LOC003", "Rotterdam", 651446, 342847, 31900.0, 3239.0, 6.5),
@@ -44,7 +47,9 @@ def init_data():
         graph.add((stats_uri, GEO.populationDensity, Literal(density, datatype=XSD.decimal)))
         graph.add((stats_uri, GEO.unemploymentRate, Literal(unemployment, datatype=XSD.decimal)))
 
+
 init_data()
+
 
 def get_statistics(location_id):
     """Get statistical data by location ID"""
@@ -72,8 +77,9 @@ def get_statistics(location_id):
         "geo:households": households,
         "geo:averageIncome": income,
         "geo:populationDensity": density,
-        "geo:unemploymentRate": unemployment
+        "geo:unemploymentRate": unemployment,
     }
+
 
 def list_locations():
     """List all locations with basic statistics"""
@@ -83,18 +89,18 @@ def list_locations():
         municipality = str(graph.value(stats_uri, GEO.municipality))
         population = str(graph.value(stats_uri, GEO.population))
 
-        locations.append({
-            "@id": str(stats_uri),
-            "@type": "geo:Municipality",
-            "geo:locationId": loc_id,
-            "geo:municipality": municipality,
-            "geo:population": population
-        })
+        locations.append(
+            {
+                "@id": str(stats_uri),
+                "@type": "geo:Municipality",
+                "geo:locationId": loc_id,
+                "geo:municipality": municipality,
+                "geo:population": population,
+            }
+        )
 
-    return {
-        "@context": {"geo": "http://example.org/geospatial#"},
-        "@graph": locations
-    }
+    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": locations}
+
 
 def get_demographics(location_id):
     """Get detailed demographic data by location ID"""
@@ -118,8 +124,9 @@ def get_demographics(location_id):
         "geo:municipality": municipality,
         "geo:population": str(population),
         "geo:households": str(households),
-        "derived:averageHouseholdSize": str(avg_household_size)
+        "derived:averageHouseholdSize": str(avg_household_size),
     }
+
 
 def handle_request(request):
     """Handle MCP JSON-RPC request"""
@@ -134,11 +141,8 @@ def handle_request(request):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {
-                    "name": "cbs-service",
-                    "version": "1.0.0"
-                }
-            }
+                "serverInfo": {"name": "cbs-service", "version": "1.0.0"},
+            },
         }
 
     elif method == "tools/list":
@@ -149,42 +153,48 @@ def handle_request(request):
                 "tools": [
                     {
                         "name": "get_statistics",
-                        "description": "Get statistical data by location ID. Returns CBS demographic data in JSON-LD format.",
+                        "description": (
+                            "Get statistical data by location ID. "
+                            "Returns CBS demographic data in JSON-LD format."
+                        ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "description": "The location ID (e.g., LOC001)"
+                                    "description": "The location ID (e.g., LOC001)",
                                 }
                             },
-                            "required": ["location_id"]
-                        }
+                            "required": ["location_id"],
+                        },
                     },
                     {
                         "name": "list_locations",
-                        "description": "List all locations with population data. Returns RDF data in JSON-LD format.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {}
-                        }
+                        "description": (
+                            "List all locations with population data. "
+                            "Returns RDF data in JSON-LD format."
+                        ),
+                        "inputSchema": {"type": "object", "properties": {}},
                     },
                     {
                         "name": "get_demographics",
-                        "description": "Get detailed demographic breakdown by location ID. Returns JSON-LD format.",
+                        "description": (
+                            "Get detailed demographic breakdown by location ID. "
+                            "Returns JSON-LD format."
+                        ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "description": "The location ID (e.g., LOC001)"
+                                    "description": "The location ID (e.g., LOC001)",
                                 }
                             },
-                            "required": ["location_id"]
-                        }
-                    }
+                            "required": ["location_id"],
+                        },
+                    },
                 ]
-            }
+            },
         }
 
     elif method == "tools/call":
@@ -203,24 +213,17 @@ def handle_request(request):
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Statistics for location {location_id} not found"
+                                "text": f"Statistics for location {location_id} not found",
                             }
                         ],
-                        "isError": True
-                    }
+                        "isError": True,
+                    },
                 }
 
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(result, indent=2)
-                        }
-                    ]
-                }
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
             }
 
         elif tool_name == "list_locations":
@@ -228,14 +231,7 @@ def handle_request(request):
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(result, indent=2)
-                        }
-                    ]
-                }
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
             }
 
         elif tool_name == "get_demographics":
@@ -250,35 +246,26 @@ def handle_request(request):
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Demographics for location {location_id} not found"
+                                "text": f"Demographics for location {location_id} not found",
                             }
                         ],
-                        "isError": True
-                    }
+                        "isError": True,
+                    },
                 }
 
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(result, indent=2)
-                        }
-                    ]
-                }
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
             }
 
     # Unknown method
     return {
         "jsonrpc": "2.0",
         "id": request_id,
-        "error": {
-            "code": -32601,
-            "message": f"Method not found: {method}"
-        }
+        "error": {"code": -32601, "message": f"Method not found: {method}"},
     }
+
 
 def main():
     """Main MCP server loop using stdio transport"""
@@ -291,12 +278,10 @@ def main():
             error_response = {
                 "jsonrpc": "2.0",
                 "id": None,
-                "error": {
-                    "code": -32603,
-                    "message": str(e)
-                }
+                "error": {"code": -32603, "message": str(e)},
             }
             print(json.dumps(error_response), flush=True)
+
 
 if __name__ == "__main__":
     main()

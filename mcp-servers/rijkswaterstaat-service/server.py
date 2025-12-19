@@ -6,7 +6,8 @@ Ministry of Infrastructure and Water Management - Infrastructure and water data
 
 import json
 import sys
-from rdflib import Graph, Namespace, Literal, URIRef
+
+from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS, XSD
 
 # Define namespace
@@ -15,6 +16,7 @@ GEO = Namespace("http://example.org/geospatial#")
 # Initialize in-memory RDF graph
 graph = Graph()
 graph.bind("geo", GEO)
+
 
 # Add sample Rijkswaterstaat data (infrastructure and water management)
 def init_data():
@@ -72,7 +74,9 @@ def init_data():
         graph.add((road_uri, GEO.maxSpeed, Literal(max_speed, datatype=XSD.integer)))
         graph.add((road_uri, GEO.condition, Literal(condition)))
 
+
 init_data()
+
 
 def get_infrastructure(location_id):
     """Get infrastructure data by location ID"""
@@ -86,14 +90,16 @@ def get_infrastructure(location_id):
             managed = str(graph.value(infra_uri, GEO.managedBy))
             description = str(graph.value(infra_uri, RDFS.label))
 
-            results.append({
-                "@id": str(infra_uri),
-                "@type": "geo:Infrastructure",
-                "geo:infrastructureType": infra_type,
-                "geo:condition": condition,
-                "geo:managedBy": managed,
-                "rdfs:label": description
-            })
+            results.append(
+                {
+                    "@id": str(infra_uri),
+                    "@type": "geo:Infrastructure",
+                    "geo:infrastructureType": infra_type,
+                    "geo:condition": condition,
+                    "geo:managedBy": managed,
+                    "rdfs:label": description,
+                }
+            )
 
     # Also get water bodies
     for water_uri in graph.subjects(RDF.type, GEO.WaterBody):
@@ -104,14 +110,16 @@ def get_infrastructure(location_id):
             managed = str(graph.value(water_uri, GEO.managedBy))
             name = str(graph.value(water_uri, RDFS.label))
 
-            results.append({
-                "@id": str(water_uri),
-                "@type": "geo:WaterBody",
-                "geo:waterType": water_type,
-                "geo:waterLevel": level,
-                "geo:managedBy": managed,
-                "rdfs:label": name
-            })
+            results.append(
+                {
+                    "@id": str(water_uri),
+                    "@type": "geo:WaterBody",
+                    "geo:waterType": water_type,
+                    "geo:waterLevel": level,
+                    "geo:managedBy": managed,
+                    "rdfs:label": name,
+                }
+            )
 
     # Also get roads
     for road_uri in graph.subjects(RDF.type, GEO.Road):
@@ -122,14 +130,16 @@ def get_infrastructure(location_id):
             max_speed = str(graph.value(road_uri, GEO.maxSpeed))
             condition = str(graph.value(road_uri, GEO.condition))
 
-            results.append({
-                "@id": str(road_uri),
-                "@type": "geo:Road",
-                "geo:roadType": road_type,
-                "geo:roadNumber": road_num,
-                "geo:maxSpeed": max_speed,
-                "geo:condition": condition
-            })
+            results.append(
+                {
+                    "@id": str(road_uri),
+                    "@type": "geo:Road",
+                    "geo:roadType": road_type,
+                    "geo:roadNumber": road_num,
+                    "geo:maxSpeed": max_speed,
+                    "geo:condition": condition,
+                }
+            )
 
     if not results:
         return None
@@ -137,11 +147,12 @@ def get_infrastructure(location_id):
     return {
         "@context": {
             "geo": "http://example.org/geospatial#",
-            "rdfs": "http://www.w3.org/2000/01/rdf-schema#"
+            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
         },
         "geo:locationId": location_id,
-        "@graph": results
+        "@graph": results,
     }
+
 
 def list_roads():
     """List all roads"""
@@ -152,19 +163,19 @@ def list_roads():
         road_num = str(graph.value(road_uri, GEO.roadNumber))
         condition = str(graph.value(road_uri, GEO.condition))
 
-        roads.append({
-            "@id": str(road_uri),
-            "@type": "geo:Road",
-            "geo:locationId": loc_id,
-            "geo:roadNumber": road_num,
-            "geo:roadType": road_type,
-            "geo:condition": condition
-        })
+        roads.append(
+            {
+                "@id": str(road_uri),
+                "@type": "geo:Road",
+                "geo:locationId": loc_id,
+                "geo:roadNumber": road_num,
+                "geo:roadType": road_type,
+                "geo:condition": condition,
+            }
+        )
 
-    return {
-        "@context": {"geo": "http://example.org/geospatial#"},
-        "@graph": roads
-    }
+    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": roads}
+
 
 def get_water_level(location_id):
     """Get water level data by location ID"""
@@ -179,7 +190,7 @@ def get_water_level(location_id):
             return {
                 "@context": {
                     "geo": "http://example.org/geospatial#",
-                    "rdfs": "http://www.w3.org/2000/01/rdf-schema#"
+                    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
                 },
                 "@id": str(water_uri),
                 "@type": "geo:WaterBody",
@@ -187,10 +198,11 @@ def get_water_level(location_id):
                 "geo:waterType": water_type,
                 "geo:waterLevel": level,
                 "geo:managedBy": managed,
-                "rdfs:label": name
+                "rdfs:label": name,
             }
 
     return None
+
 
 def handle_request(request):
     """Handle MCP JSON-RPC request"""
@@ -205,11 +217,8 @@ def handle_request(request):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {
-                    "name": "rijkswaterstaat-service",
-                    "version": "1.0.0"
-                }
-            }
+                "serverInfo": {"name": "rijkswaterstaat-service", "version": "1.0.0"},
+            },
         }
 
     elif method == "tools/list":
@@ -220,42 +229,47 @@ def handle_request(request):
                 "tools": [
                     {
                         "name": "get_infrastructure",
-                        "description": "Get infrastructure data (roads, bridges, water) by location ID. Returns Rijkswaterstaat data in JSON-LD format.",
+                        "description": (
+                            "Get infrastructure data (roads, bridges, water) by location ID. "
+                            "Returns Rijkswaterstaat data in JSON-LD format."
+                        ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "description": "The location ID (e.g., LOC001)"
+                                    "description": "The location ID (e.g., LOC001)",
                                 }
                             },
-                            "required": ["location_id"]
-                        }
+                            "required": ["location_id"],
+                        },
                     },
                     {
                         "name": "list_roads",
-                        "description": "List all roads managed by Rijkswaterstaat. Returns RDF data in JSON-LD format.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {}
-                        }
+                        "description": (
+                            "List all roads managed by Rijkswaterstaat. "
+                            "Returns RDF data in JSON-LD format."
+                        ),
+                        "inputSchema": {"type": "object", "properties": {}},
                     },
                     {
                         "name": "get_water_level",
-                        "description": "Get current water level data by location ID. Returns JSON-LD format.",
+                        "description": (
+                            "Get current water level data by location ID. Returns JSON-LD format."
+                        ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "description": "The location ID (e.g., LOC001)"
+                                    "description": "The location ID (e.g., LOC001)",
                                 }
                             },
-                            "required": ["location_id"]
-                        }
-                    }
+                            "required": ["location_id"],
+                        },
+                    },
                 ]
-            }
+            },
         }
 
     elif method == "tools/call":
@@ -274,24 +288,17 @@ def handle_request(request):
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Infrastructure for location {location_id} not found"
+                                "text": f"Infrastructure for location {location_id} not found",
                             }
                         ],
-                        "isError": True
-                    }
+                        "isError": True,
+                    },
                 }
 
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(result, indent=2)
-                        }
-                    ]
-                }
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
             }
 
         elif tool_name == "list_roads":
@@ -299,14 +306,7 @@ def handle_request(request):
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(result, indent=2)
-                        }
-                    ]
-                }
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
             }
 
         elif tool_name == "get_water_level":
@@ -321,35 +321,26 @@ def handle_request(request):
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Water level data for location {location_id} not found"
+                                "text": f"Water level data for location {location_id} not found",
                             }
                         ],
-                        "isError": True
-                    }
+                        "isError": True,
+                    },
                 }
 
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(result, indent=2)
-                        }
-                    ]
-                }
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
             }
 
     # Unknown method
     return {
         "jsonrpc": "2.0",
         "id": request_id,
-        "error": {
-            "code": -32601,
-            "message": f"Method not found: {method}"
-        }
+        "error": {"code": -32601, "message": f"Method not found: {method}"},
     }
+
 
 def main():
     """Main MCP server loop using stdio transport"""
@@ -362,12 +353,10 @@ def main():
             error_response = {
                 "jsonrpc": "2.0",
                 "id": None,
-                "error": {
-                    "code": -32603,
-                    "message": str(e)
-                }
+                "error": {"code": -32603, "message": str(e)},
             }
             print(json.dumps(error_response), flush=True)
+
 
 if __name__ == "__main__":
     main()

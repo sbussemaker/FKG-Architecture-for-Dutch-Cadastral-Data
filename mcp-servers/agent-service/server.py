@@ -10,12 +10,20 @@ the appropriate backend services.
 """
 
 import json
-import sys
+import logging
 import os
 import subprocess
-import logging
-from typing import Dict, Any, List
+import sys
+from typing import Any, cast
+
 from openai import AzureOpenAI
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageParam,
+    ChatCompletionMessageToolCallParam,
+    ChatCompletionToolMessageParam,
+    ChatCompletionToolParam,
+)
 
 # Configure logging
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "DEBUG").upper()
@@ -23,10 +31,8 @@ log_level = getattr(logging, LOG_LEVEL, logging.INFO)
 
 logging.basicConfig(
     level=log_level,
-    format='%(asctime)s [%(levelname)s] [Agent] %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stderr)
-    ]
+    format="%(asctime)s [%(levelname)s] [Agent] %(message)s",
+    handlers=[logging.StreamHandler(sys.stderr)],
 )
 logger = logging.getLogger(__name__)
 
@@ -40,30 +46,43 @@ AZURE_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-08-01-previ
 
 if AZURE_ENDPOINT and AZURE_API_KEY and AZURE_DEPLOYMENT:
     client = AzureOpenAI(
-        azure_endpoint=AZURE_ENDPOINT,
-        api_key=AZURE_API_KEY,
-        api_version=AZURE_API_VERSION
+        azure_endpoint=AZURE_ENDPOINT, api_key=AZURE_API_KEY, api_version=AZURE_API_VERSION
     )
-    logger.info(f"Azure OpenAI client initialized (endpoint={AZURE_ENDPOINT}, deployment={AZURE_DEPLOYMENT})")
+    logger.info(
+        f"Azure OpenAI client initialized "
+        f"(endpoint={AZURE_ENDPOINT}, deployment={AZURE_DEPLOYMENT})"
+    )
 else:
     client = None
     logger.warning("Azure OpenAI credentials not set. Agent will return errors.")
-    logger.warning("Required: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT_NAME")
+    logger.warning(
+        "Required: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT_NAME"
+    )
 
 # MCP service configuration
 MCP_SERVICES = {
     "Kadaster": {
         "container": "eai-kadaster-service",
-        "description": "Query the Kadaster (Dutch Land Registry) for property ownership, cadastral data, building information. Use for questions about properties, owners, buildings, land use."
+        "description": (
+            "Query the Kadaster (Dutch Land Registry) for property ownership, "
+            "cadastral data, building information. Use for questions about "
+            "properties, owners, buildings, land use."
+        ),
     },
     "CBS": {
         "container": "eai-cbs-service",
-        "description": "Query CBS (Statistics Netherlands) for demographics, population, income, unemployment. Use for statistical questions."
+        "description": (
+            "Query CBS (Statistics Netherlands) for demographics, population, "
+            "income, unemployment. Use for statistical questions."
+        ),
     },
     "Rijkswaterstaat": {
         "container": "eai-rijkswaterstaat-service",
-        "description": "Query Rijkswaterstaat for infrastructure, roads, bridges, water bodies, water levels. Use for infrastructure questions."
-    }
+        "description": (
+            "Query Rijkswaterstaat for infrastructure, roads, bridges, water "
+            "bodies, water levels. Use for infrastructure questions."
+        ),
+    },
 }
 
 # Cache for dynamically discovered tools
@@ -75,9 +94,10 @@ MCP_SERVICES = {
 #   },
 #   ...
 # }
-_BACKEND_TOOLS_CACHE = None
+_BACKEND_TOOLS_CACHE: dict[str, dict[str, Any]] | None = None
 
-def discover_tools_from_service(container_name: str) -> List[Dict[str, Any]]:
+
+def discover_tools_from_service(container_name: str) -> list[dict[str, Any]]:
     """
     Discover available tools from an MCP service using tools/list
 
@@ -89,37 +109,41 @@ def discover_tools_from_service(container_name: str) -> List[Dict[str, Any]]:
     """
     try:
         process = subprocess.Popen(
-            ['docker', 'exec', '-i', container_name, 'python', '-u', 'server.py'],
+            ["docker", "exec", "-i", container_name, "python", "-u", "server.py"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
         )
 
         # Send initialize request
-        init_request = json.dumps({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "agent-service", "version": "1.0.0"}
-            }
-        }) + "\n"
+        init_request = (
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {},
+                        "clientInfo": {"name": "agent-service", "version": "1.0.0"},
+                    },
+                }
+            )
+            + "\n"
+        )
+
+        if process.stdin is None or process.stdout is None:
+            raise RuntimeError(f"Failed to create process stdin/stdout for {container_name}")
 
         process.stdin.write(init_request)
         process.stdin.flush()
 
         # Read initialize response
-        init_response = process.stdout.readline()
+        _ = process.stdout.readline()
 
         # Send tools/list request
-        tools_request = json.dumps({
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/list"
-        }) + "\n"
+        tools_request = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}) + "\n"
 
         process.stdin.write(tools_request)
         process.stdin.flush()
@@ -141,7 +165,8 @@ def discover_tools_from_service(container_name: str) -> List[Dict[str, Any]]:
         logger.error(f"Error discovering tools from {container_name}: {e}")
         return []
 
-def get_backend_tools() -> List[Dict[str, Any]]:
+
+def get_backend_tools() -> list[dict[str, Any]]:
     """
     Get backend tools, discovering them dynamically if not cached
 
@@ -152,7 +177,11 @@ def get_backend_tools() -> List[Dict[str, Any]]:
 
     if _BACKEND_TOOLS_CACHE is not None:
         # Return just the wrapper tools for OpenAI
-        return [cache_entry["wrapper_tool"] for cache_entry in _BACKEND_TOOLS_CACHE.values()]
+        return [
+            cache_entry["wrapper_tool"]
+            for cache_entry in _BACKEND_TOOLS_CACHE.values()
+            if "wrapper_tool" in cache_entry
+        ]
 
     backend_tools_cache = {}
 
@@ -180,22 +209,25 @@ def get_backend_tools() -> List[Dict[str, Any]]:
                     "tool": {
                         "type": "string",
                         "enum": tool_names,
-                        "description": f"The {service_name} tool to call"
+                        "description": f"The {service_name} tool to call",
                     },
                     "location_id": {
                         "type": "string",
-                        "description": "Location ID (LOC001=Amsterdam, LOC002=Utrecht, LOC003=Rotterdam). Required for most tools."
-                    }
+                        "description": (
+                            "Location ID (LOC001=Amsterdam, LOC002=Utrecht, "
+                            "LOC003=Rotterdam). Required for most tools."
+                        ),
+                    },
                 },
-                "required": ["tool"]
-            }
+                "required": ["tool"],
+            },
         }
 
         # Cache the service information
         backend_tools_cache[service_name] = {
             "container": container,
             "wrapper_tool": wrapper_tool,
-            "discovered_tools": discovered_tools
+            "discovered_tools": discovered_tools,
         }
 
         logger.info(f"Discovered {len(tool_names)} tools from {service_name}: {tool_names}")
@@ -203,7 +235,10 @@ def get_backend_tools() -> List[Dict[str, Any]]:
     _BACKEND_TOOLS_CACHE = backend_tools_cache
     return [cache_entry["wrapper_tool"] for cache_entry in backend_tools_cache.values()]
 
-def call_mcp_service(service_name: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+
+def call_mcp_service(
+    service_name: str, tool_name: str, arguments: dict[str, Any]
+) -> dict[str, Any]:
     """
     Call another MCP service using stdio transport
 
@@ -219,41 +254,51 @@ def call_mcp_service(service_name: str, tool_name: str, arguments: Dict[str, Any
     try:
         # Start the MCP server container and communicate via stdio
         process = subprocess.Popen(
-            ['docker', 'exec', '-i', service_name, 'python', '-u', 'server.py'],
+            ["docker", "exec", "-i", service_name, "python", "-u", "server.py"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
         )
 
         # Send initialize request
-        init_request = json.dumps({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "agent-service", "version": "1.0.0"}
-            }
-        }) + "\n"
+        init_request = (
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {},
+                        "clientInfo": {"name": "agent-service", "version": "1.0.0"},
+                    },
+                }
+            )
+            + "\n"
+        )
+
+        if process.stdin is None or process.stdout is None:
+            raise RuntimeError(f"Failed to create process stdin/stdout for {service_name}")
 
         process.stdin.write(init_request)
         process.stdin.flush()
 
         # Read initialize response
-        init_response = process.stdout.readline()
+        _ = process.stdout.readline()
 
         # Send tool call request
-        tool_request = json.dumps({
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": arguments
-            }
-        }) + "\n"
+        tool_request = (
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {"name": tool_name, "arguments": arguments},
+                }
+            )
+            + "\n"
+        )
 
         process.stdin.write(tool_request)
         process.stdin.flush()
@@ -275,7 +320,8 @@ def call_mcp_service(service_name: str, tool_name: str, arguments: Dict[str, Any
         logger.error(f"Error calling MCP service {service_name}: {e}")
         return {"error": str(e)}
 
-def convert_tools_to_openai_format(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+def convert_tools_to_openai_format(tools: list[dict[str, Any]]) -> list[ChatCompletionToolParam]:
     """
     Convert MCP tool definitions to OpenAI function calling format
 
@@ -285,20 +331,24 @@ def convert_tools_to_openai_format(tools: List[Dict[str, Any]]) -> List[Dict[str
     Returns:
         List of tools in OpenAI format
     """
-    openai_tools = []
+    openai_tools: list[ChatCompletionToolParam] = []
     for tool in tools:
-        openai_tool = {
-            "type": "function",
-            "function": {
-                "name": tool["name"],
-                "description": tool["description"],
-                "parameters": tool["input_schema"]
-            }
-        }
+        openai_tool = cast(
+            ChatCompletionToolParam,
+            {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "parameters": tool["input_schema"],
+                },
+            },
+        )
         openai_tools.append(openai_tool)
     return openai_tools
 
-def execute_backend_tool(tool_name: str, tool_input: Dict[str, Any]) -> Dict[str, Any]:
+
+def execute_backend_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
     """Execute a backend MCP tool"""
 
     # Ensure cache is populated
@@ -307,17 +357,21 @@ def execute_backend_tool(tool_name: str, tool_input: Dict[str, Any]) -> Dict[str
     logger.debug(f"execute_backend_tool called with tool_name={tool_name}, tool_input={tool_input}")
 
     # Handle case where OpenAI might concatenate service.tool names
-    if "." in tool_name and tool_name not in _BACKEND_TOOLS_CACHE:
+    if "." in tool_name and (_BACKEND_TOOLS_CACHE is None or tool_name not in _BACKEND_TOOLS_CACHE):
         # Split "Rijkswaterstaat.get_water_level" into service and tool
         service_name, mcp_tool = tool_name.split(".", 1)
-        logger.info(f"Detected dotted tool name, splitting into service={service_name}, tool={mcp_tool}")
+        logger.info(
+            f"Detected dotted tool name, splitting into service={service_name}, tool={mcp_tool}"
+        )
 
         if _BACKEND_TOOLS_CACHE is None or service_name not in _BACKEND_TOOLS_CACHE:
             return {"error": f"Unknown service: {service_name}"}
 
         cache_entry = _BACKEND_TOOLS_CACHE[service_name]
         container_name = cache_entry["container"]
-        arguments = {"location_id": tool_input.get("location_id")} if "location_id" in tool_input else {}
+        arguments = (
+            {"location_id": tool_input.get("location_id")} if "location_id" in tool_input else {}
+        )
 
     else:
         # Standard wrapper tool format
@@ -331,12 +385,15 @@ def execute_backend_tool(tool_name: str, tool_input: Dict[str, Any]) -> Dict[str
             return {"error": f"Missing 'tool' parameter in tool_input: {tool_input}"}
 
         mcp_tool = tool_input["tool"]
-        arguments = {"location_id": tool_input.get("location_id")} if "location_id" in tool_input else {}
+        arguments = (
+            {"location_id": tool_input.get("location_id")} if "location_id" in tool_input else {}
+        )
 
     # Call the backend MCP service
     result = call_mcp_service(container_name, mcp_tool, arguments)
 
     return result
+
 
 def ask_question(question: str) -> str:
     """
@@ -351,40 +408,47 @@ def ask_question(question: str) -> str:
     if not client:
         return "Error: Azure OpenAI credentials not set. Cannot use AI agent."
 
-    messages = [
+    if not AZURE_DEPLOYMENT:
+        return "Error: Azure OpenAI deployment name not set. Cannot use AI agent."
+
+    messages: list[ChatCompletionMessageParam] = [
         {
             "role": "system",
-            "content": """You are an expert assistant with access to Dutch geospatial data from three government agencies:
-- Kadaster (Land Registry): Property ownership, cadastral data, buildings
-- CBS (Statistics Netherlands): Demographics, population, income statistics
-- Rijkswaterstaat (Infrastructure & Water): Roads, bridges, canals, water levels
-
-Available locations:
-- LOC001: Amsterdam (Damrak 1)
-- LOC002: Utrecht (Oudegracht 231)
-- LOC003: Rotterdam (Coolsingel 40)
-
-CRITICAL RULES:
-1. You MUST use the available tools to gather all information
-2. You MUST NOT make guesses or use general knowledge to answer questions
-3. You MUST ONLY answer based on data returned from the tools
-4. If a tool call fails or returns an error, inform the user that the data is unavailable
-5. If you cannot get data from the tools, say so explicitly - do NOT provide approximations or guesses
-6. NEVER use phrases like "approximately", "based on latest data", "prior to", or "around" unless that data came from a tool
-7. If tools don't return data, respond with: "I was unable to retrieve that information from the available data sources."
-
-CITATION REQUIREMENTS:
-8. For EACH piece of information in your answer, you MUST cite the source tool that provided it
-9. Use this format: "- **Field Name**: Value (Source: ServiceName > tool_name)"
-10. Example: "- **Owner**: Gemeente Amsterdam (Source: Kadaster > get_property_details)"
-11. If multiple tools provided related information, cite all relevant sources
-
-Your answers must be based EXCLUSIVELY on tool results. No exceptions."""
+            "content": (
+                "You are an expert assistant with access to Dutch geospatial data "
+                "from three government agencies:\n"
+                "- Kadaster (Land Registry): Property ownership, cadastral data, buildings\n"
+                "- CBS (Statistics Netherlands): Demographics, population, income statistics\n"
+                "- Rijkswaterstaat (Infrastructure & Water): Roads, bridges, canals, "
+                "water levels\n\n"
+                "Available locations:\n"
+                "- LOC001: Amsterdam (Damrak 1)\n"
+                "- LOC002: Utrecht (Oudegracht 231)\n"
+                "- LOC003: Rotterdam (Coolsingel 40)\n\n"
+                "CRITICAL RULES:\n"
+                "1. You MUST use the available tools to gather all information\n"
+                "2. You MUST NOT make guesses or use general knowledge to answer questions\n"
+                "3. You MUST ONLY answer based on data returned from the tools\n"
+                "4. If a tool call fails or returns an error, inform the user that the "
+                "data is unavailable\n"
+                "5. If you cannot get data from the tools, say so explicitly - do NOT "
+                "provide approximations or guesses\n"
+                '6. NEVER use phrases like "approximately", "based on latest data", '
+                '"prior to", or "around" unless that data came from a tool\n'
+                "7. If tools don't return data, respond with: "
+                '"I was unable to retrieve that information from the available data sources."\n\n'
+                "CITATION REQUIREMENTS:\n"
+                "8. For EACH piece of information in your answer, you MUST cite the "
+                "source tool that provided it\n"
+                '9. Use this format: "- **Field Name**: Value '
+                '(Source: ServiceName > tool_name)"\n'
+                '10. Example: "- **Owner**: Gemeente Amsterdam '
+                '(Source: Kadaster > get_property_details)"\n'
+                "11. If multiple tools provided related information, cite all relevant sources\n\n"
+                "Your answers must be based EXCLUSIVELY on tool results. No exceptions."
+            ),
         },
-        {
-            "role": "user",
-            "content": question
-        }
+        {"role": "user", "content": question},
     ]
 
     max_iterations = 5
@@ -406,7 +470,7 @@ Your answers must be based EXCLUSIVELY on tool results. No exceptions."""
             max_tokens=4096,
             tool_choice="auto",
             tools=openai_tools,
-            messages=messages
+            messages=messages,
         )
 
         message = response.choices[0].message
@@ -416,25 +480,37 @@ Your answers must be based EXCLUSIVELY on tool results. No exceptions."""
             logger.info(f"AI model wants to call {len(message.tool_calls)} tool(s)")
 
             # Add assistant's message to conversation
-            messages.append({
+            tool_calls_param: list[ChatCompletionMessageToolCallParam] = []
+            for tc in message.tool_calls:
+                # Only handle function tool calls
+                if tc.type == "function" and hasattr(tc, "function"):
+                    tool_calls_param.append(
+                        cast(
+                            ChatCompletionMessageToolCallParam,
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments,
+                                },
+                            },
+                        )
+                    )
+
+            assistant_message: ChatCompletionAssistantMessageParam = {
                 "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments
-                        }
-                    } for tc in message.tool_calls
-                ]
-            })
+                "tool_calls": tool_calls_param,
+            }
+            messages.append(assistant_message)
 
             # Execute each tool call
             for tool_call in message.tool_calls:
-                tool_name = tool_call.function.name
-                tool_input = json.loads(tool_call.function.arguments)
+                if tool_call.type == "function" and hasattr(tool_call, "function"):
+                    tool_name = tool_call.function.name
+                    tool_input = json.loads(tool_call.function.arguments)
+                else:
+                    continue
 
                 logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
 
@@ -448,11 +524,12 @@ Your answers must be based EXCLUSIVELY on tool results. No exceptions."""
                     logger.info(f"Tool {tool_name} completed successfully")
 
                 # Add tool result to messages
-                messages.append({
+                tool_message: ChatCompletionToolMessageParam = {
                     "role": "tool",
                     "tool_call_id": tool_call.id,
-                    "content": json.dumps(result, indent=2)
-                })
+                    "content": json.dumps(result, indent=2),
+                }
+                messages.append(tool_message)
 
         elif message.content:
             # Model provided a final answer
@@ -465,6 +542,7 @@ Your answers must be based EXCLUSIVELY on tool results. No exceptions."""
 
     logger.warning(f"Maximum iterations ({max_iterations}) reached without completing the query")
     return "Maximum iterations reached without completing the query."
+
 
 def handle_request(request):
     """Handle MCP JSON-RPC request"""
@@ -484,9 +562,9 @@ def handle_request(request):
                 "serverInfo": {
                     "name": "agent-service",
                     "version": "1.0.0",
-                    "description": "AI Agent that queries Kadaster, CBS, and Rijkswaterstaat"
-                }
-            }
+                    "description": "AI Agent that queries Kadaster, CBS, and Rijkswaterstaat",
+                },
+            },
         }
 
     elif method == "tools/list":
@@ -497,20 +575,28 @@ def handle_request(request):
                 "tools": [
                     {
                         "name": "ask_question",
-                        "description": "Ask a natural language question about Dutch locations. The agent will intelligently query Kadaster, CBS, and Rijkswaterstaat services and synthesize a comprehensive answer.",
+                        "description": (
+                            "Ask a natural language question about Dutch locations. "
+                            "The agent will intelligently query Kadaster, CBS, and "
+                            "Rijkswaterstaat services and synthesize a comprehensive answer."
+                        ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "question": {
                                     "type": "string",
-                                    "description": "Your question about locations, demographics, properties, or infrastructure (e.g., 'What is the population of Amsterdam?')"
+                                    "description": (
+                                        "Your question about locations, demographics, "
+                                        "properties, or infrastructure "
+                                        "(e.g., 'What is the population of Amsterdam?')"
+                                    ),
                                 }
                             },
-                            "required": ["question"]
-                        }
+                            "required": ["question"],
+                        },
                     }
                 ]
-            }
+            },
         }
 
     elif method == "tools/call":
@@ -527,27 +613,20 @@ def handle_request(request):
                     "id": request_id,
                     "result": {
                         "content": [{"type": "text", "text": "Error: Question is required"}],
-                        "isError": True
-                    }
+                        "isError": True,
+                    },
                 }
 
             logger.info(f"Received question: {question}")
 
             try:
                 answer = ask_question(question)
-                logger.info(f"Successfully answered question")
+                logger.info("Successfully answered question")
 
                 return {
                     "jsonrpc": "2.0",
                     "id": request_id,
-                    "result": {
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": answer
-                            }
-                        ]
-                    }
+                    "result": {"content": [{"type": "text", "text": answer}]},
                 }
             except Exception as e:
                 logger.exception(f"Error processing question: {e}")
@@ -556,19 +635,17 @@ def handle_request(request):
                     "id": request_id,
                     "result": {
                         "content": [{"type": "text", "text": f"Error: {str(e)}"}],
-                        "isError": True
-                    }
+                        "isError": True,
+                    },
                 }
 
     # Unknown method
     return {
         "jsonrpc": "2.0",
         "id": request_id,
-        "error": {
-            "code": -32601,
-            "message": f"Method not found: {method}"
-        }
+        "error": {"code": -32601, "message": f"Method not found: {method}"},
     }
+
 
 def main():
     """Main MCP server loop using stdio transport"""
@@ -585,12 +662,10 @@ def main():
             error_response = {
                 "jsonrpc": "2.0",
                 "id": None,
-                "error": {
-                    "code": -32603,
-                    "message": str(e)
-                }
+                "error": {"code": -32603, "message": str(e)},
             }
             print(json.dumps(error_response), flush=True)
+
 
 if __name__ == "__main__":
     main()

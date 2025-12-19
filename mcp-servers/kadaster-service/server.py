@@ -6,8 +6,9 @@ Dutch Land Registry - Cadastral data, property boundaries, and ownership informa
 
 import json
 import sys
-from rdflib import Graph, Namespace, Literal, URIRef
-from rdflib.namespace import RDF, RDFS, XSD
+
+from rdflib import Graph, Literal, Namespace, URIRef
+from rdflib.namespace import RDF, XSD
 
 # Define namespace
 GEO = Namespace("http://example.org/geospatial#")
@@ -16,16 +17,62 @@ GEO = Namespace("http://example.org/geospatial#")
 graph = Graph()
 graph.bind("geo", GEO)
 
+
 # Add sample Kadaster data (property ownership and cadastral information)
 def init_data():
     properties = [
-        # (locationId, cadastralId, address, postalCode, municipality, owner, surfaceArea, landUse, buildingType, constructionYear)
-        ("LOC001", "AMS01-G-1234", "Damrak 1", "1012 LG", "Amsterdam", "Gemeente Amsterdam", 450.5, "commercial", "office", 1920),
-        ("LOC002", "UTR02-K-5678", "Oudegracht 231", "3511 NK", "Utrecht", "Universiteit Utrecht", 320.0, "educational", "university", 1636),
-        ("LOC003", "RTD03-A-9012", "Coolsingel 40", "3011 AD", "Rotterdam", "Gemeente Rotterdam", 1200.0, "government", "municipal_building", 1914),
+        # (locationId, cadastralId, address, postalCode, municipality, owner,
+        #  surfaceArea, landUse, buildingType, constructionYear)
+        (
+            "LOC001",
+            "AMS01-G-1234",
+            "Damrak 1",
+            "1012 LG",
+            "Amsterdam",
+            "Gemeente Amsterdam",
+            450.5,
+            "commercial",
+            "office",
+            1920,
+        ),
+        (
+            "LOC002",
+            "UTR02-K-5678",
+            "Oudegracht 231",
+            "3511 NK",
+            "Utrecht",
+            "Universiteit Utrecht",
+            320.0,
+            "educational",
+            "university",
+            1636,
+        ),
+        (
+            "LOC003",
+            "RTD03-A-9012",
+            "Coolsingel 40",
+            "3011 AD",
+            "Rotterdam",
+            "Gemeente Rotterdam",
+            1200.0,
+            "government",
+            "municipal_building",
+            1914,
+        ),
     ]
 
-    for loc_id, cadastral_id, address, postal, municipality, owner, surface, land_use, building_type, year in properties:
+    for (
+        loc_id,
+        cadastral_id,
+        address,
+        postal,
+        municipality,
+        owner,
+        surface,
+        land_use,
+        building_type,
+        year,
+    ) in properties:
         location_uri = URIRef(f"http://example.org/locations/{loc_id}")
         property_uri = URIRef(f"http://example.org/properties/{cadastral_id}")
 
@@ -46,7 +93,9 @@ def init_data():
         graph.add((property_uri, GEO.buildingType, Literal(building_type)))
         graph.add((property_uri, GEO.constructionYear, Literal(year, datatype=XSD.integer)))
 
+
 init_data()
+
 
 def get_property(location_id):
     """Get cadastral property data by location ID"""
@@ -92,8 +141,9 @@ def get_property(location_id):
         "geo:surfaceArea": surface,
         "geo:landUse": land_use,
         "geo:buildingType": building_type,
-        "geo:constructionYear": construction_year
+        "geo:constructionYear": construction_year,
     }
+
 
 def list_properties():
     """List all cadastral properties"""
@@ -108,20 +158,20 @@ def list_properties():
         location_uri = URIRef(f"http://example.org/locations/{loc_id}")
         address = str(graph.value(location_uri, GEO.address))
 
-        properties.append({
-            "@id": str(property_uri),
-            "@type": "geo:Property",
-            "geo:cadastralId": cadastral_id,
-            "geo:locationId": loc_id,
-            "geo:address": address,
-            "geo:owner": owner,
-            "geo:surfaceArea": surface
-        })
+        properties.append(
+            {
+                "@id": str(property_uri),
+                "@type": "geo:Property",
+                "geo:cadastralId": cadastral_id,
+                "geo:locationId": loc_id,
+                "geo:address": address,
+                "geo:owner": owner,
+                "geo:surfaceArea": surface,
+            }
+        )
 
-    return {
-        "@context": {"geo": "http://example.org/geospatial#"},
-        "@graph": properties
-    }
+    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": properties}
+
 
 def handle_request(request):
     """Handle MCP JSON-RPC request"""
@@ -136,11 +186,8 @@ def handle_request(request):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {
-                    "name": "kadaster-service",
-                    "version": "1.0.0"
-                }
-            }
+                "serverInfo": {"name": "kadaster-service", "version": "1.0.0"},
+            },
         }
 
     elif method == "tools/list":
@@ -151,28 +198,30 @@ def handle_request(request):
                 "tools": [
                     {
                         "name": "get_property",
-                        "description": "Get cadastral property data by location ID. Returns Kadaster registry data in JSON-LD format.",
+                        "description": (
+                            "Get cadastral property data by location ID. "
+                            "Returns Kadaster registry data in JSON-LD format."
+                        ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "description": "The location ID (e.g., LOC001)"
+                                    "description": "The location ID (e.g., LOC001)",
                                 }
                             },
-                            "required": ["location_id"]
-                        }
+                            "required": ["location_id"],
+                        },
                     },
                     {
                         "name": "list_properties",
-                        "description": "List all cadastral properties. Returns RDF data in JSON-LD format.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {}
-                        }
-                    }
+                        "description": (
+                            "List all cadastral properties. Returns RDF data in JSON-LD format."
+                        ),
+                        "inputSchema": {"type": "object", "properties": {}},
+                    },
                 ]
-            }
+            },
         }
 
     elif method == "tools/call":
@@ -191,24 +240,17 @@ def handle_request(request):
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Property for location {location_id} not found"
+                                "text": f"Property for location {location_id} not found",
                             }
                         ],
-                        "isError": True
-                    }
+                        "isError": True,
+                    },
                 }
 
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(result, indent=2)
-                        }
-                    ]
-                }
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
             }
 
         elif tool_name == "list_properties":
@@ -216,25 +258,16 @@ def handle_request(request):
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(result, indent=2)
-                        }
-                    ]
-                }
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
             }
 
     # Unknown method
     return {
         "jsonrpc": "2.0",
         "id": request_id,
-        "error": {
-            "code": -32601,
-            "message": f"Method not found: {method}"
-        }
+        "error": {"code": -32601, "message": f"Method not found: {method}"},
     }
+
 
 def main():
     """Main MCP server loop using stdio transport"""
@@ -247,12 +280,10 @@ def main():
             error_response = {
                 "jsonrpc": "2.0",
                 "id": None,
-                "error": {
-                    "code": -32603,
-                    "message": str(e)
-                }
+                "error": {"code": -32603, "message": str(e)},
             }
             print(json.dumps(error_response), flush=True)
+
 
 if __name__ == "__main__":
     main()

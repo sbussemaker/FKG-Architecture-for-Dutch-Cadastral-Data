@@ -10,19 +10,19 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             padding: 20px;
             min-height: 100vh;
         }
-        
+
         .container {
             max-width: 1400px;
             margin: 0 auto;
         }
-        
+
         header {
             background: white;
             padding: 20px;
@@ -30,23 +30,23 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
         }
-        
+
         h1 {
             color: #333;
             margin-bottom: 10px;
         }
-        
+
         .subtitle {
             color: #666;
             font-size: 14px;
         }
-        
+
         .main-content {
             display: grid;
             grid-template-columns: 2fr 1fr;
             gap: 20px;
         }
-        
+
         .archimate-view {
             background: white;
             padding: 30px;
@@ -54,7 +54,7 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             min-height: 500px;
         }
-        
+
         .view-title {
             font-size: 18px;
             font-weight: 600;
@@ -63,12 +63,12 @@
             padding-bottom: 10px;
             border-bottom: 2px solid #667eea;
         }
-        
+
         .services-container {
             position: relative;
             min-height: 400px;
         }
-        
+
         /* ArchiMate Application Service styling */
         .service-box {
             position: absolute;
@@ -80,12 +80,12 @@
             cursor: move;
             transition: all 0.3s ease;
         }
-        
+
         .service-box:hover {
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             transform: translateY(-2px);
         }
-        
+
         .service-box.running {
             background: #c6f6d5;
             border-color: #38a169;
@@ -102,13 +102,13 @@
             border-color: #059669;
             border-width: 3px;
         }
-        
+
         .service-header {
             display: flex;
             align-items: center;
             margin-bottom: 10px;
         }
-        
+
         .service-icon {
             width: 30px;
             height: 30px;
@@ -122,23 +122,23 @@
             font-weight: bold;
             font-size: 14px;
         }
-        
+
         .service-box.running .service-icon {
             background: #38a169;
         }
-        
+
         .service-name {
             font-weight: 600;
             color: #2d3748;
             font-size: 14px;
         }
-        
+
         .service-description {
             font-size: 12px;
             color: #4a5568;
             margin-bottom: 10px;
         }
-        
+
         .service-entities {
             font-size: 11px;
             color: #718096;
@@ -147,7 +147,7 @@
             background: white;
             border-radius: 4px;
         }
-        
+
         .service-status {
             font-size: 11px;
             padding: 4px 8px;
@@ -155,22 +155,22 @@
             display: inline-block;
             margin-bottom: 10px;
         }
-        
+
         .service-status.running {
             background: #38a169;
             color: white;
         }
-        
+
         .service-status.stopped {
             background: #e53e3e;
             color: white;
         }
-        
+
         .service-controls {
             display: flex;
             gap: 8px;
         }
-        
+
         .btn {
             padding: 6px 12px;
             border: none;
@@ -181,26 +181,26 @@
             transition: all 0.2s;
             flex: 1;
         }
-        
+
         .btn:hover {
             opacity: 0.8;
         }
-        
+
         .btn-start {
             background: #48bb78;
             color: white;
         }
-        
+
         .btn-stop {
             background: #f56565;
             color: white;
         }
-        
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
-        
+
         /* Data flow connections */
         .connection-line {
             position: absolute;
@@ -209,45 +209,45 @@
             transform-origin: left center;
             pointer-events: none;
         }
-        
+
         .connection-line.active {
             background: #38a169;
             box-shadow: 0 0 8px #38a169;
         }
-        
+
         .side-panel {
             display: flex;
             flex-direction: column;
             gap: 20px;
         }
-        
+
         .panel {
             background: white;
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        
+
         .panel-title {
             font-size: 16px;
             font-weight: 600;
             color: #333;
             margin-bottom: 15px;
         }
-        
+
         .query-builder {
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
-        
+
         select, input {
             padding: 8px;
             border: 1px solid #cbd5e0;
             border-radius: 4px;
             font-size: 13px;
         }
-        
+
         .btn-query {
             background: #667eea;
             color: white;
@@ -257,17 +257,17 @@
             cursor: pointer;
             font-weight: 500;
         }
-        
+
         .btn-query:hover {
             background: #5568d3;
         }
-        
+
         .results {
             margin-top: 15px;
             max-height: 300px;
             overflow-y: auto;
         }
-        
+
         .result-item {
             background: #f7fafc;
             padding: 10px;
@@ -275,7 +275,7 @@
             margin-bottom: 10px;
             font-size: 12px;
         }
-        
+
         .result-item pre {
             margin-top: 5px;
             background: white;
@@ -284,32 +284,32 @@
             overflow-x: auto;
             font-size: 11px;
         }
-        
+
         .legend {
             display: flex;
             flex-direction: column;
             gap: 8px;
             font-size: 12px;
         }
-        
+
         .legend-item {
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        
+
         .legend-box {
             width: 30px;
             height: 20px;
             border: 2px solid #4a5568;
             border-radius: 4px;
         }
-        
+
         .legend-box.running {
             background: #c6f6d5;
             border-color: #38a169;
         }
-        
+
         .legend-box.stopped {
             background: #e8f4f8;
             border-color: #4a5568;
@@ -322,13 +322,13 @@
             <h1>🇳🇱 Dutch Geospatial Data Integration</h1>
             <p class="subtitle">ArchiMate Application Cooperation View | MCP + RDF | Kadaster · CBS · Rijkswaterstaat</p>
         </header>
-        
+
         <div class="main-content">
             <div class="archimate-view">
                 <div class="view-title">Application Cooperation Viewpoint</div>
                 <div id="services" class="services-container"></div>
             </div>
-            
+
             <div class="side-panel">
                 <div class="panel">
                     <div class="panel-title">🔍 Query Services (MCP Protocol)</div>
@@ -344,7 +344,7 @@
                     </div>
                     <div id="results" class="results"></div>
                 </div>
-                
+
                 <div class="panel">
                     <div class="panel-title">📋 Legend</div>
                     <div class="legend">
@@ -362,7 +362,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="panel">
                     <div class="panel-title">📖 RDF Ontology</div>
                     <div style="font-size: 11px; color: #4a5568;">
@@ -374,7 +374,7 @@
             </div>
         </div>
     </div>
-    
+
     <script>
         const API_BASE = 'http://localhost:5000/api';
         let services = [];
@@ -397,7 +397,7 @@
                 {name: 'ask_question', args: {question: 'What is the population of Amsterdam?'}}
             ]
         };
-        
+
         async function loadServices() {
             try {
                 const response = await fetch(`${API_BASE}/services`);
@@ -408,7 +408,7 @@
                 console.error('Error loading services:', error);
             }
         }
-        
+
         function renderServices() {
             const container = document.getElementById('services');
             container.innerHTML = '';
@@ -444,7 +444,7 @@
 
             drawConnections();
         }
-        
+
         function drawConnections() {
             // Remove existing connections
             document.querySelectorAll('.connection-line').forEach(line => line.remove());
@@ -502,7 +502,7 @@
                 container.appendChild(line);
             });
         }
-        
+
         async function startService(serviceName) {
             try {
                 const response = await fetch(`${API_BASE}/services/${serviceName}/start`, {
@@ -515,7 +515,7 @@
                 console.error('Error starting service:', error);
             }
         }
-        
+
         async function stopService(serviceName) {
             try {
                 const response = await fetch(`${API_BASE}/services/${serviceName}/stop`, {
@@ -528,7 +528,7 @@
                 console.error('Error stopping service:', error);
             }
         }
-        
+
         function updateServiceSelect() {
             const select = document.getElementById('service-select');
             const toolSelect = document.getElementById('tool-select');
@@ -557,12 +557,12 @@
                 toolSelect.value = currentTool; // Restore tool selection
             }
         }
-        
+
         document.getElementById('service-select').addEventListener('change', (e) => {
             const serviceName = e.target.value;
             const toolSelect = document.getElementById('tool-select');
             toolSelect.innerHTML = '<option value="">Select a tool...</option>';
-            
+
             if (serviceName && serviceTools[serviceName]) {
                 serviceTools[serviceName].forEach(tool => {
                     const option = document.createElement('option');
@@ -573,14 +573,14 @@
                 });
             }
         });
-        
+
         document.getElementById('tool-select').addEventListener('change', (e) => {
             const selected = e.target.selectedOptions[0];
             if (selected && selected.dataset.args) {
                 document.getElementById('args-input').value = selected.dataset.args;
             }
         });
-        
+
         async function askAgent() {
             const question = document.getElementById('agent-question').value;
 
@@ -622,12 +622,12 @@
             const service = document.getElementById('service-select').value;
             const tool = document.getElementById('tool-select').value;
             const argsText = document.getElementById('args-input').value;
-            
+
             if (!service || !tool) {
                 alert('Please select a service and tool');
                 return;
             }
-            
+
             let args = {};
             try {
                 if (argsText.trim()) {
@@ -637,10 +637,10 @@
                 alert('Invalid JSON arguments');
                 return;
             }
-            
+
             const resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = '<div style="color: #666;">Executing query...</div>';
-            
+
             try {
                 const response = await fetch(`${API_BASE}/query`, {
                     method: 'POST',
@@ -649,22 +649,22 @@
                         queries: [{service, tool, arguments: args}]
                     })
                 });
-                
+
                 const data = await response.json();
                 displayResults(data.results);
             } catch (error) {
                 resultsDiv.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
             }
         }
-        
+
         function displayResults(results) {
             const resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = '';
-            
+
             results.forEach((result, index) => {
                 const item = document.createElement('div');
                 item.className = 'result-item';
-                
+
                 let content = '';
                 if (result.result && result.result.result && result.result.result.content) {
                     const textContent = result.result.result.content[0].text;
@@ -674,20 +674,20 @@
                 } else {
                     content = `<pre>${JSON.stringify(result.result, null, 2)}</pre>`;
                 }
-                
+
                 item.innerHTML = `
                     <strong>${result.service} → ${result.tool}</strong>
                     ${content}
                 `;
-                
+
                 resultsDiv.appendChild(item);
             });
         }
-        
+
         // Initialize
         loadServices();
         setInterval(loadServices, 5000);
-        
+
         // Redraw connections on window resize
         window.addEventListener('resize', drawConnections);
     </script>
