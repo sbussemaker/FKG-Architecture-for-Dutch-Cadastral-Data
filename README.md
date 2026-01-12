@@ -164,15 +164,13 @@ ais/
 ├── ontology/
 │   └── geospatial.ttl           # Shared RDF geospatial ontology
 ├── mcp-servers/
+│   ├── Dockerfile.shared        # Shared distroless Docker image
 │   ├── kadaster-service/
-│   │   ├── server.py            # Kadaster MCP server
-│   │   └── Dockerfile
+│   │   └── server.py            # Kadaster MCP server
 │   ├── cbs-service/
-│   │   ├── server.py            # CBS MCP server
-│   │   └── Dockerfile
+│   │   └── server.py            # CBS MCP server
 │   └── rijkswaterstaat-service/
-│       ├── server.py            # Rijkswaterstaat MCP server
-│       └── Dockerfile
+│       └── server.py            # Rijkswaterstaat MCP server
 ├── client/
 │   └── orchestrator.py          # Backend orchestrator (MCP client)
 ├── dashboard/
@@ -323,6 +321,12 @@ All three services use the shared geospatial ontology, ensuring:
 - See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for technical details
 
 ### Docker Integration
+
+All three MCP services (Kadaster, CBS, Rijkswaterstaat) share a distroless Docker image for enhanced security and reduced size:
+- **Distroless base**: Using `gcr.io/distroless/python3-debian12` (no shell, minimal attack surface)
+- **Image size**: 91.4MB (48% smaller than standard python:3.14-slim at 177MB)
+- **Multi-stage build**: Dependencies installed in builder stage, copied to minimal runtime
+- **Shared Dockerfile**: `/mcp-servers/Dockerfile.shared` used by all three services
 
 Each service runs in isolation with:
 - No exposed ports (stdio communication only)

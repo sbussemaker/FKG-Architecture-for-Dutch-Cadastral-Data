@@ -1,0 +1,24 @@
+# Multi-stage build for distroless Python image
+FROM python:3.14-slim AS builder
+
+WORKDIR /app
+
+# Install rdflib and dependencies
+RUN pip install --no-cache-dir --target=/app/packages rdflib
+
+# Distroless runtime stage
+FROM gcr.io/distroless/python3-debian12
+
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /app/packages /app/packages
+
+# Copy server script (will be provided via build context)
+COPY server.py .
+
+# Set Python path to find installed packages
+ENV PYTHONPATH=/app/packages
+
+# Run the MCP server
+CMD ["server.py", "-u"]

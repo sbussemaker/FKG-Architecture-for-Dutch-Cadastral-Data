@@ -1,20 +1,26 @@
 services:
   kadaster-service:
-    build: ./mcp-servers/kadaster-service
+    build:
+      context: ./mcp-servers/kadaster-service
+      dockerfile: ../Dockerfile.shared
     container_name: eai-kadaster-service
     stdin_open: true
     tty: false
     restart: unless-stopped
 
   cbs-service:
-    build: ./mcp-servers/cbs-service
+    build:
+      context: ./mcp-servers/cbs-service
+      dockerfile: ../Dockerfile.shared
     container_name: eai-cbs-service
     stdin_open: true
     tty: false
     restart: unless-stopped
 
   rijkswaterstaat-service:
-    build: ./mcp-servers/rijkswaterstaat-service
+    build:
+      context: ./mcp-servers/rijkswaterstaat-service
+      dockerfile: ../Dockerfile.shared
     container_name: eai-rijkswaterstaat-service
     stdin_open: true
     tty: false
