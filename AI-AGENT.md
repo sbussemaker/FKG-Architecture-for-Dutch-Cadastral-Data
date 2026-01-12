@@ -36,49 +36,20 @@ The AI Agent acts as an **orchestrating LLM** that:
               Comprehensive Answer
 ```
 
-## Architecture
+---
 
-### Components
-
-**1. Agent Module (`client/agent.py`)**
-- `GeospatialAgent` class that manages the interaction with Azure OpenAI
-- Defines available tools (one for each MCP service)
-- Handles the agent loop (tool use, result gathering, synthesis)
-
-**2. Orchestrator Integration (`client/orchestrator.py`)**
-- New endpoint: `POST /api/agent/ask`
-- Bridges the agent to the MCP tool execution
-- Handles authentication and error management
-
-**3. Dashboard UI (`dashboard/index.html`)**
-- Text area for natural language questions
-- Real-time feedback during agent execution
-- Formatted display of agent responses
-
-### Tool Definitions
-
-The agent has access to three high-level tools:
-
-1. **query_kadaster**: Property ownership, cadastral data, buildings
-2. **query_cbs**: Demographics, population, statistics
-3. **query_rijkswaterstaat**: Infrastructure, roads, water management
-
-Each tool can invoke specific MCP server tools based on the sub-tool parameter.
-
-## Setup
+## Quick Start
 
 ### 1. Install Dependencies
 
 ```bash
 cd /home/stefan/ais
-uv sync  # or pip install -r pyproject.toml
+uv sync  # Installs Azure OpenAI SDK
 ```
-
-This installs the Azure OpenAI SDK (`openai` package).
 
 ### 2. Configure Azure OpenAI
 
-Configure your Azure OpenAI credentials in the `.env` file at the project root:
+Create or edit the `.env` file at the project root:
 
 ```bash
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
@@ -87,23 +58,25 @@ AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
 AZURE_OPENAI_API_VERSION=2024-12-01-preview
 ```
 
-These environment variables will be automatically loaded by the orchestrator and passed to the agent service.
-
-### 3. Start the Orchestrator
+### 3. Start the System
 
 ```bash
+# Start orchestrator (builds all images including agent)
 cd client
 python orchestrator.py
+
+# Open dashboard
+open ../dashboard/index.html
 ```
 
-The agent will be automatically available if the API key is set.
+### 4. Start Services
 
-### 4. Start MCP Services
+From the dashboard:
+1. Start Kadaster, CBS, and Rijkswaterstaat services
+2. Start the AI Agent service
+3. Use the "🤖 AI Agent" panel to ask questions
 
-From the dashboard, start all three services:
-- Kadaster
-- CBS
-- Rijkswaterstaat
+---
 
 ## Usage
 
@@ -147,6 +120,8 @@ Response:
 }
 ```
 
+---
+
 ## How It Works
 
 ### 1. Question Understanding
@@ -178,7 +153,7 @@ The AI model combines data from all sources into a coherent, natural language an
 - Relationships between data points
 - Context and interpretation
 
-## Agent Loop
+### Agent Loop
 
 The agent follows a loop pattern:
 
@@ -193,6 +168,213 @@ The agent follows a loop pattern:
 ```
 
 Maximum iterations: 5 (configurable)
+
+---
+
+## Architecture
+
+### Design Pattern: MCP Agent Server
+
+This system implements an **MCP Agent Server** - a pure MCP approach where the AI Agent is itself an MCP server that acts as a client to other MCP servers.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    User / Dashboard                       │
+└─────────────────────────┬────────────────────────────────┘
+                          │ MCP Protocol
+                          ↓
+                ┌──────────────────┐
+                │  Agent Service   │  ← MCP Server (exposes ask_question)
+                │  (Meta-Agent)    │  ← MCP Client (queries others)
+                └────────┬─────────┘
+                         │ MCP Protocol
+        ┌────────────────┼────────────────┐
+        ↓                ↓                 ↓
+   ┌─────────┐      ┌─────────┐     ┌──────────────┐
+   │Kadaster │      │   CBS   │     │Rijkswaterstaat│
+   │  (MCP)  │      │  (MCP)  │     │     (MCP)     │
+   └─────────┘      └─────────┘     └──────────────┘
+```
+
+### Why This Architecture?
+
+**Protocol Consistency**
+- Everything speaks MCP - no mixing of protocols
+- Dashboard → Orchestrator → MCP services (including Agent)
+- Agent → Other MCP services
+
+**Composability**
+- Agent is just another service that can be:
+  - Started/stopped like other services
+  - Queried via standard MCP tools
+  - Replaced or upgraded independently
+  - Used by any MCP client
+
+**Clean Separation**
+- Data services (Kadaster, CBS, Rijkswaterstaat) → Pure data providers
+- Agent service → Pure intelligent orchestrator
+- No special case logic in the orchestrator
+
+**Scalability**
+- Each service can be scaled independently
+- Agent can be containerized and deployed anywhere
+- Multiple agents can coexist
+
+### Components
+
+**1. Agent Module (`client/agent.py`)**
+- `GeospatialAgent` class that manages the interaction with Azure OpenAI
+- Defines available tools (one for each MCP service)
+- Handles the agent loop (tool use, result gathering, synthesis)
+
+**2. Agent MCP Server (`mcp-servers/agent-service/server.py`)**
+
+**Role:** Meta-Agent - both MCP server and MCP client
+
+**Exposes (as MCP Server):**
+```json
+{
+  "tool": "ask_question",
+  "description": "Ask a natural language question about Dutch locations",
+  "arguments": {
+    "question": "Your question here"
+  }
+}
+```
+
+**Consumes (as MCP Client):**
+- Kadaster service tools: `get_property`, `list_properties`
+- CBS service tools: `get_statistics`, `list_locations`, `get_demographics`
+- Rijkswaterstaat tools: `get_infrastructure`, `list_roads`, `get_water_level`
+
+**Internal Architecture:**
+```python
+1. Receive ask_question tool call via MCP
+2. Use Azure OpenAI to analyze the question
+3. AI model decides which backend services to query
+4. Execute MCP tool calls to backend services (via docker exec stdio)
+5. AI model synthesizes results from all sources
+6. Return synthesized answer via MCP response
+```
+
+**3. Orchestrator Integration (`client/orchestrator.py`)**
+- New endpoint: `POST /api/agent/ask`
+- Bridges the agent to the MCP tool execution
+- Handles authentication and error management
+- Agent service configured in SERVICES dictionary
+
+**4. Dashboard UI (`dashboard/index.html`)**
+- Text area for natural language questions
+- Real-time feedback during agent execution
+- Formatted display of agent responses
+- Agent appears as a service box with 🤖 icon
+
+---
+
+## Technical Implementation
+
+### Agent Service Communication
+
+The agent uses **stdio transport** to communicate with backend services:
+
+```python
+def call_mcp_service(service_name, tool_name, arguments):
+    # Start MCP server in docker container
+    process = subprocess.Popen(
+        ['docker', 'exec', '-i', service_name, 'python', '-u', 'server.py'],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True
+    )
+
+    # Send initialize request
+    init_request = {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        ...
+    }
+
+    # Send tool call request
+    tool_request = {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {"name": tool_name, "arguments": arguments}
+    }
+
+    # Read response
+    response = process.stdout.readline()
+    return json.loads(response)
+```
+
+### Agent Logic Flow
+
+```
+User Question: "What is the population of Amsterdam?"
+    ↓
+Agent MCP Server receives: ask_question(question="...")
+    ↓
+Azure OpenAI analyzes question
+    ↓
+AI model decides: "Need CBS demographic data for Amsterdam"
+    ↓
+Agent calls: call_mcp_service("eai-cbs-service", "get_statistics", {location_id: "LOC001"})
+    ↓
+CBS returns population data
+    ↓
+AI model synthesizes: "Amsterdam has a population of 872,680..."
+    ↓
+Agent returns answer via MCP response
+```
+
+### Multi-Source Query Example
+
+```
+Question: "Compare Amsterdam and Rotterdam"
+    ↓
+AI model decides: Need data from multiple services and locations
+    ↓
+Tool calls (parallel):
+  - Kadaster: get_property(LOC001)
+  - Kadaster: get_property(LOC003)
+  - CBS: get_statistics(LOC001)
+  - CBS: get_statistics(LOC003)
+  - Rijkswaterstaat: get_infrastructure(LOC001)
+  - Rijkswaterstaat: get_infrastructure(LOC003)
+    ↓
+AI model synthesizes comprehensive comparison
+    ↓
+Returns detailed answer
+```
+
+### Docker Configuration
+
+The agent service requires specific Docker configuration:
+
+```yaml
+agent-service:
+  build: ./mcp-servers/agent-service
+  container_name: eai-agent-service
+  env_file:
+    - .env
+  environment:
+    - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+    - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+    - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
+    - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+  depends_on:
+    - kadaster-service
+    - cbs-service
+    - rijkswaterstaat-service
+```
+
+**Key points:**
+- Azure OpenAI credentials loaded from `.env` file
+- Docker socket mounted to allow calling other containers
+- Depends on data services
+
+---
 
 ## Example Agent Execution
 
@@ -241,13 +423,75 @@ properties, and well-maintained infrastructure including canals and modern
 highways.
 ```
 
-## Limitations
+---
 
-1. **Data scope**: Limited to the three sample locations (Amsterdam, Utrecht, Rotterdam)
-2. **Tool calls**: Maximum 5 iterations to prevent infinite loops
-3. **API costs**: Each question uses Claude API tokens
-4. **Service availability**: All relevant MCP services must be running
-5. **Language**: Currently optimized for English questions
+## Troubleshooting
+
+### "AI Agent not available"
+**Cause**: Azure OpenAI SDK not installed or credentials not configured
+
+**Solution**:
+```bash
+uv sync
+# Configure .env file with Azure OpenAI credentials
+```
+
+### "Maximum iterations reached"
+**Cause**: Agent couldn't complete in 5 tool-use cycles
+
+**Solution**: Simplify the question or increase `max_iterations` in the agent service code
+
+### "Service not running"
+**Cause**: Required MCP service is stopped
+
+**Solution**: Start all services from the dashboard
+
+### Agent service won't start
+
+**Issue:** Container fails to start or immediately exits
+
+**Check:**
+```bash
+docker logs eai-agent-service
+```
+
+**Common causes:**
+- Azure OpenAI credentials not configured in `.env`
+- Python dependencies missing
+- Syntax error in server.py
+
+### Agent returns errors
+
+**Issue:** Agent tool call fails
+
+**Check logs:**
+```bash
+docker logs eai-agent-service 2>&1 | grep -i error
+```
+
+**Common causes:**
+- Backend services not running
+- Docker socket not mounted
+- Invalid question format
+
+### Slow responses
+
+**Issue:** Agent takes long time to respond
+
+**Normal behavior:**
+- Simple queries: 2-4 seconds
+- Multi-service queries: 4-8 seconds
+- Complex synthesis: 6-10 seconds
+
+**To investigate:**
+```bash
+# Watch agent logs in real-time
+docker logs -f eai-agent-service
+```
+
+Look for which services are being called and how long each takes.
+
+---
 
 ## Advanced Usage
 
@@ -272,11 +516,12 @@ The agent can handle various question formats:
 
 ### Debugging
 
-Enable debug logging to see the agent's tool calls:
+Enable debug logging in the agent service:
 
 ```python
-# In agent.py, the agent logs each tool call:
-print(f"[Agent] Calling {tool_name} with input: {tool_input}")
+# In agent-service/server.py
+import logging
+logging.basicConfig(level=logging.DEBUG)
 ```
 
 Check orchestrator logs:
@@ -288,8 +533,8 @@ tail -f /tmp/orchestrator.log | grep Agent
 
 **Add new capabilities:**
 
-1. Add new tools to `AVAILABLE_TOOLS` in `agent.py`
-2. Implement the tool execution in `_execute_tool()`
+1. Add new tools to `AVAILABLE_TOOLS` in agent service
+2. Implement the tool execution logic
 3. Update the system prompt with tool descriptions
 
 **Example: Add weather data**
@@ -306,31 +551,108 @@ tail -f /tmp/orchestrator.log | grep Agent
 }
 ```
 
-## Troubleshooting
+---
 
-### "AI Agent not available"
-**Cause**: Azure OpenAI SDK not installed or credentials not configured
-**Solution**:
-```bash
-pip install openai
-# Configure .env file with Azure OpenAI credentials
+## Performance & Optimization
+
+### Response Times
+
+**Typical performance:**
+- Single service query: 2-4 seconds
+- Multi-service query: 4-8 seconds
+- Complex synthesis: 6-10 seconds
+
+### Optimization Opportunities
+
+**Caching:**
+```python
+@lru_cache(maxsize=100)
+def get_cached_answer(question):
+    return ask_question(question)
 ```
 
-### "Maximum iterations reached"
-**Cause**: Agent couldn't complete in 5 tool-use cycles
-**Solution**: Simplify the question or increase `max_iterations` in `agent.py`
+**Parallel Tool Calls:**
+The AI model can execute multiple tools in parallel:
+```python
+# AI model decides to call 3 services at once
+with ThreadPoolExecutor() as executor:
+    futures = [
+        executor.submit(call_service, "kadaster", ...),
+        executor.submit(call_service, "cbs", ...),
+        executor.submit(call_service, "rijkswaterstaat", ...)
+    ]
+    results = [f.result() for f in futures]
+```
 
-### "Service not running"
-**Cause**: Required MCP service is stopped
-**Solution**: Start all services from the dashboard
+**Connection Pooling:**
+Reuse connections to backend services:
+```python
+# Keep subprocess alive for multiple queries
+class PersistentMCPClient:
+    def __init__(self, service_name):
+        self.process = subprocess.Popen(...)
 
-### Slow responses
-**Cause**: API latency or multiple sequential tool calls
-**Solution**: Normal for complex questions. Typically 3-10 seconds.
+    def call_tool(self, name, args):
+        # Reuse existing process
+        ...
+```
+
+**Pre-warming:**
+- Cache frequently asked questions
+- Pre-warm MCP service connections
+- Implement streaming responses
+
+---
+
+## Security Considerations
+
+### API Key Management
+
+**Never commit credentials:**
+```bash
+# .gitignore
+.env
+**/.env*
+```
+
+**Use environment variables from .env file:**
+```bash
+# .env file
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=your-key-here
+```
+
+**Or use secrets management:**
+```bash
+docker secret create azure_openai_key ./api_key.txt
+```
+
+### Docker Socket Access
+
+The agent needs Docker socket access to call other containers. This is powerful and should be protected:
+
+**Production considerations:**
+- Run in isolated network
+- Use Docker API with authentication
+- Limit container permissions
+
+### Input Validation
+
+The agent validates questions but malicious inputs could:
+- Cause expensive API calls
+- Trigger unintended service queries
+
+**Mitigations:**
+- Rate limiting
+- Input sanitization
+- Max token limits in AI model calls
+- No code execution - agent can only call predefined MCP tools
+
+---
 
 ## Cost Considerations
 
-The agent uses Azure OpenAI, which has API costs based on your Azure deployment:
+The agent uses Azure OpenAI, which has API costs based on your deployment:
 - Costs vary by model and region
 - Check your Azure OpenAI pricing tier for specific rates
 
@@ -338,40 +660,89 @@ Typical token usage:
 - Simple query (1 tool call): ~1,000-3,000 tokens
 - Complex query (3 tool calls): ~5,000-10,000 tokens
 
-## Security
+---
 
-1. **API Credentials**: Never commit `.env` file with Azure OpenAI credentials to version control
-2. **Input validation**: Agent endpoint validates questions
-3. **Sandboxed execution**: Agent can only call predefined MCP tools
-4. **No code execution**: Agent cannot execute arbitrary code
+## Limitations
 
-## Performance
+1. **Data scope**: Limited to the three sample locations (Amsterdam, Utrecht, Rotterdam)
+2. **Tool calls**: Maximum 5 iterations to prevent infinite loops
+3. **API costs**: Each question uses Azure OpenAI API tokens
+4. **Service availability**: All relevant MCP services must be running
+5. **Language**: Currently optimized for English questions
 
-**Response times:**
-- Single service query: 2-4 seconds
-- Multi-service query: 4-8 seconds
-- Complex synthesis: 6-10 seconds
-
-**Optimization opportunities:**
-- Cache frequently asked questions
-- Implement streaming responses
-- Pre-warm MCP service connections
+---
 
 ## Future Enhancements
 
-1. **Streaming responses**: Show partial answers as they're generated
-2. **Conversation memory**: Multi-turn conversations with context
-3. **Source citations**: Link back to specific MCP service responses
-4. **Visualization**: Generate charts/graphs from numerical data
-5. **Real data integration**: Connect to actual Kadaster/CBS/Rijkswaterstaat APIs
+### 1. Agent Capabilities
+
+**Streaming responses:**
+```python
+# Return partial results as they're generated
+for chunk in openai_stream:
+    yield {"type": "progress", "text": chunk}
+```
+
+**Multi-turn conversations:**
+```python
+# Maintain conversation state
+{
+  "tool": "ask_followup",
+  "arguments": {
+    "question": "What about Utrecht?",
+    "conversation_id": "conv-123"
+  }
+}
+```
+
+**Source citations:**
+Link back to specific MCP service responses
+
+**Visualization:**
+Generate charts/graphs from numerical data
+
+### 2. Multiple Agents
+
+Deploy specialized agents:
+```
+agent-demographic: Expert in CBS data
+agent-property: Expert in Kadaster data
+agent-infrastructure: Expert in Rijkswaterstaat data
+agent-general: Queries all sources
+```
+
+### 3. Agent Chaining
+
+Agents can call other agents:
+```
+User → General Agent → Demographic Agent → CBS Service
+                     → Property Agent → Kadaster Service
+```
+
+### 4. Real Data Integration
+
+Connect to actual APIs:
+```python
+# In agent-service
+def call_real_kadaster_api():
+    response = requests.get("https://api.kadaster.nl/...")
+    return process_real_data(response)
+```
+
+---
 
 ## References
 
 - [Azure OpenAI Service Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/)
 - [Azure OpenAI Function Calling](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/function-calling)
-- [MCP Protocol Specification](https://modelcontextprotocol.io/)
+- [Model Context Protocol Specification](https://modelcontextprotocol.io/)
+- [Docker Engine API - Attach to Container](https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerAttach)
+- [JSON-RPC 2.0 Specification](https://www.jsonrpc.org/specification)
 
 ---
 
-**Last Updated:** 2025-12-13
+**Last Updated:** 2025-12-24
 **Agent Model:** Azure OpenAI (GPT-4o or GPT-4o-mini)
+**Architecture Type:** Meta-Agent Pattern (MCP Agent Server)
+**Protocol:** Model Context Protocol (MCP)
+**Transport:** stdio (JSON-RPC 2.0)
