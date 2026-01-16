@@ -1,5 +1,8 @@
 # Dutch Geospatial Data Integration - MCP Demo
 
+> [!NOTE]
+> This demo is made as part of the course "Architectures of Information Systems" 2025, taught by University of Twente. The architecture of this project (Archi model) is found at https://github.com/sbussemaker/2526-AIS-Group-9.
+
 A demonstration project showcasing Enterprise Architecture Integration (EAI) using Dutch government data sources:
 - **Kadaster** (Dutch Land Registry) - Cadastral and property data
 - **CBS** (Statistics Netherlands) - Demographic and statistical data
@@ -17,14 +20,14 @@ This demo illustrates how three independent government agencies can share comple
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │         HTML Dashboard (ArchiMate View)                        │
-│  ┌──────────┐    ┌──────────┐    ┌──────────────────┐        │
-│  │ Kadaster │───→│   CBS    │───→│ Rijkswaterstaat │        │
-│  │  (Land   │    │  (Stats) │    │ (Infrastructure)│        │
-│  │ Registry)│    │          │    │  & Water Mgmt   │        │
-│  └──────────┘    └──────────┘    └──────────────────┘        │
+│  ┌──────────┐    ┌──────────┐    ┌──────────────────┐          │
+│  │ Kadaster │───→│   CBS    │───→│ Rijkswaterstaat  │          │
+│  │  (Land   │    │  (Stats) │    │ (Infrastructure) │          │
+│  │ Registry)│    │          │    │  & Water Mgmt    │          │
+│  └──────────┘    └──────────┘    └──────────────────┘          │
 │        ↓               ↓                   ↓                   │
 │        └───────────────┴───────────────────┘                   │
-│                        │                                        │
+│                        │                                       │
 │                  RDF Data Flows                                │
 └────────────────────────┬───────────────────────────────────────┘
                          │
@@ -34,7 +37,7 @@ This demo illustrates how three independent government agencies can share comple
                 │  (Orchestrator)│
                 └────────────────┘
                          │
-        ┌────────────────┼────────────────┐
+        ┌────────────────┼─────────────────┐
         ↓                ↓                 ↓
 ┌─────────────┐   ┌─────────────┐   ┌──────────────────┐
 │ MCP Server  │   │ MCP Server  │   │ MCP Server       │
@@ -409,15 +412,6 @@ This demo demonstrates:
 6. ✅ **RESTful Orchestration**: API-based service coordination
 7. ✅ **Data Integration**: Combining complementary data from multiple authoritative sources
 8. ✅ **AI-Powered Integration**: LLM agent that intelligently queries and synthesizes data
-
-## Troubleshooting
-
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions to:
-- Docker socket communication issues
-- UTF-8 encoding problems
-- Dashboard UI issues
-- Service connectivity problems
-- Debugging tips and logging
 
 ## License
 
