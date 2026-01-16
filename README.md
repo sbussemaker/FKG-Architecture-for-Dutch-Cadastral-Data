@@ -15,6 +15,8 @@ This demo illustrates how three independent government agencies can share comple
 - **Docker** for containerization
 - **JSON-RPC** for remote procedure calls
 
+![alt text](demo-ui.png)
+
 ## Quick start
 
 To start the demo:
