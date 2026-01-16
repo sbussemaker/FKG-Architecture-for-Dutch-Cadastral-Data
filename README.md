@@ -94,7 +94,7 @@ The system includes an **intelligent AI agent** powered by Azure OpenAI that can
 - "Tell me about the property and demographics in Amsterdam"
 - "Which city has the highest population density?"
 
-See [AI-AGENT.md](AI-AGENT.md) for detailed documentation.
+See [AGENTS.md](AGENTS.md) for detailed documentation.
 
 ## MCP Services
 

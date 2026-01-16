@@ -4,7 +4,7 @@
 - ✅ Added `.env` file with Azure OpenAI credentials and updated docker-compose.yml to load it
 - ✅ Replaced Anthropic SDK with Azure OpenAI SDK
 - ✅ `.env` variables are now passed to agent service in orchestrator.py
-- ✅ Updated all documentation (README.md, AI-AGENT.md, MCP-AGENT-ARCHITECTURE.md) from Anthropic to Azure OpenAI
+- ✅ Updated all documentation (README.md, AGENTS.md) from Anthropic to Azure OpenAI
 - ✅ Replaced all print statements with proper logging in agent-service/server.py
 - ✅ Added strict system prompt to prevent AI from making guesses (only uses tool data)
 - ✅ Added LOG_LEVEL environment variable for configurable logging (DEBUG, INFO, WARNING, ERROR)
