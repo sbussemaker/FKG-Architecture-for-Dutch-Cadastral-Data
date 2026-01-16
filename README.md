@@ -15,6 +15,22 @@ This demo illustrates how three independent government agencies can share comple
 - **Docker** for containerization
 - **JSON-RPC** for remote procedure calls
 
+## Quick start
+
+To start the demo:
+
+```console
+cd client
+python orchestrator.py
+```
+
+and
+
+```console
+cd dashboard
+python -m http.server 8080
+```
+
 ## Architecture Overview
 
 ```

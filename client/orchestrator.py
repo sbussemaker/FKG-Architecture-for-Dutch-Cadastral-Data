@@ -61,6 +61,7 @@ SERVICES = {
         "description": "Dutch Land Registry - Cadastral data",
         "image": "eai-kadaster-service",
         "build_path": "../mcp-servers/kadaster-service",
+        "dockerfile": "../Dockerfile.shared",
         "container_name": "eai-kadaster-service",
         "status": "stopped",
         "rdf_entities": ["Property", "Location"],
@@ -72,6 +73,7 @@ SERVICES = {
         "description": "Statistics Netherlands - Demographics",
         "image": "eai-cbs-service",
         "build_path": "../mcp-servers/cbs-service",
+        "dockerfile": "../Dockerfile.shared",
         "container_name": "eai-cbs-service",
         "status": "stopped",
         "rdf_entities": ["Municipality", "Statistics"],
@@ -83,6 +85,7 @@ SERVICES = {
         "description": "Infrastructure & Water Management",
         "image": "eai-rijkswaterstaat-service",
         "build_path": "../mcp-servers/rijkswaterstaat-service",
+        "dockerfile": "../Dockerfile.shared",
         "container_name": "eai-rijkswaterstaat-service",
         "status": "stopped",
         "rdf_entities": ["Infrastructure", "WaterBody", "Road"],
@@ -94,6 +97,7 @@ SERVICES = {
         "description": "Intelligent agent (queries all services)",
         "image": "eai-agent-service",
         "build_path": "../mcp-servers/agent-service",
+        "dockerfile": "Dockerfile",
         "container_name": "eai-agent-service",
         "status": "stopped",
         "rdf_entities": ["Agent"],
@@ -380,6 +384,7 @@ if __name__ == "__main__":
         logger.info(f"Building {service['image']}...")
         docker_client.images.build(
             path=service["build_path"],
+            dockerfile=service["dockerfile"],
             tag=service["image"],
             rm=True,  # Remove intermediate containers
             forcerm=True,  # Always remove intermediate containers
