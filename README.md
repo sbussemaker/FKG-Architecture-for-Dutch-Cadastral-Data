@@ -400,23 +400,6 @@ Add more geospatial concepts:
 - Land use planning
 - Cultural heritage sites
 
-## Course Learning Objectives
-
-This demo demonstrates:
-
-1. ✅ **Service-Oriented Architecture**: Independent, loosely-coupled services
-2. ✅ **Semantic Interoperability**: Shared RDF ontology across organizations
-3. ✅ **Modern Integration Patterns**: MCP protocol for service communication
-4. ✅ **Containerization**: Docker for deployment and isolation
-5. ✅ **Enterprise Architecture**: ArchiMate modeling and visualization
-6. ✅ **RESTful Orchestration**: API-based service coordination
-7. ✅ **Data Integration**: Combining complementary data from multiple authoritative sources
-8. ✅ **AI-Powered Integration**: LLM agent that intelligently queries and synthesizes data
-
-## License
-
-MIT License - Free to use for educational purposes.
-
 ## References
 
 - [Kadaster](https://www.kadaster.nl/) - Dutch Land Registry
