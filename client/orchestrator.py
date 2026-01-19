@@ -16,6 +16,7 @@ import uvicorn
 from docker.errors import ImageNotFound, NotFound
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from mcp_client import call_mcp_tool, list_mcp_tools
 from pydantic import BaseModel, Field
 
@@ -380,7 +381,7 @@ def get_ontology():
     try:
         with open("../ontology/geospatial.ttl") as f:
             ontology = f.read()
-        return OntologyResponse(ontology=ontology)
+        return Response(content=ontology, media_type="text/turtle")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
