@@ -16,10 +16,14 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.391
+  - repo: local
     hooks:
-      - id: pyright
+      - id: ty
+        name: ty
+        entry: uv run ty check
+        language: system
+        types: [python]
+        pass_filenames: false
 
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.9.15
