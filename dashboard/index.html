@@ -322,12 +322,12 @@
     <div class="container">
         <header>
             <h1>🇳🇱 Dutch Geospatial Data Integration</h1>
-            <p class="subtitle">ArchiMate Application Cooperation View | MCP + RDF | Kadaster · CBS · Rijkswaterstaat</p>
+            <p class="subtitle">MCP + RDF | Kadaster · CBS · Rijkswaterstaat</p>
         </header>
 
         <div class="main-content">
             <div class="archimate-view">
-                <div class="view-title">Application Cooperation Viewpoint</div>
+                <div class="view-title">Application Cooperation</div>
                 <div id="services" class="services-container"></div>
             </div>
 
@@ -370,7 +370,8 @@
                     <div style="font-size: 11px; color: #4a5568;">
                         <strong>Namespace:</strong> http://example.org/geospatial#<br><br>
                         <strong>Classes:</strong> Location, Property, Municipality, Building, WaterBody, Road, Infrastructure<br><br>
-                        <strong>Properties:</strong> locationId, cadastralId, address, population, waterLevel, roadType, etc.
+                        <strong>Properties:</strong> locationId, cadastralId, address, population, waterLevel, roadType, etc.<br><br>
+                        <strong>Inspect: </strong><span id="turtle-link"></span>
                     </div>
                 </div>
             </div>
@@ -583,6 +584,11 @@
             }
         });
 
+        function setOntologyURL() {
+            const ontologyUrlSpan = document.getElementById('turtle-link');
+            ontologyUrlSpan.innerHTML = `<a href="${API_BASE}/ontology">the ontology turtle file</a>`;
+        }
+
         async function askAgent() {
             const question = document.getElementById('agent-question').value;
 
@@ -688,6 +694,7 @@
 
         // Initialize
         loadServices();
+        setOntologyURL();
         setInterval(loadServices, 5000);
 
         // Redraw connections on window resize
