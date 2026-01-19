@@ -217,7 +217,19 @@ def handle_request(request):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "rijkswaterstaat-service", "version": "1.0.0"},
+                "serverInfo": {
+                    "name": "rijkswaterstaat-service",
+                    "version": "1.0.0",
+                    "description": (
+                        "Rijkswaterstaat (Dutch Ministry of Infrastructure and Water Management) "
+                        "MCP Server. Provides data on national infrastructure including highways, "
+                        "bridges, tunnels, locks, canals, rivers, and water levels. "
+                        "Data source: Rijkswaterstaat (rijkswaterstaat.nl). "
+                        "Use this service for questions about: roads and highways, bridges and "
+                        "tunnels, water bodies (canals, rivers), water levels, infrastructure "
+                        "condition, and which organization manages specific infrastructure."
+                    ),
+                },
             },
         }
 
@@ -230,15 +242,33 @@ def handle_request(request):
                     {
                         "name": "get_infrastructure",
                         "description": (
-                            "Get infrastructure data (roads, bridges, water) by location ID. "
-                            "Returns Rijkswaterstaat data in JSON-LD format."
+                            "Retrieve ALL infrastructure data for a location: roads, bridges, "
+                            "tunnels, locks, AND water bodies. Most comprehensive tool. "
+                            "USE THIS TOOL WHEN: You need a complete infrastructure overview, "
+                            "want to know what bridges/tunnels exist, or need combined road and "
+                            "water data for a location. "
+                            "RETURNS: JSON-LD with three types of objects: "
+                            "(1) Infrastructure: infrastructureType (bridge/tunnel/lock), "
+                            "condition (good/fair/poor), managedBy, label (name). "
+                            "(2) WaterBody: waterType (canal/river), waterLevel (meters relative "
+                            "to NAP), managedBy, label. "
+                            "(3) Road: roadType (highway), roadNumber (e.g., A10), maxSpeed, "
+                            "condition. "
+                            "EXAMPLE: For LOC001 (Amsterdam), returns IJ-tunnel (bridge), "
+                            "Damrak canal (water level 0.4m), and A10 highway."
                         ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "description": "The location ID (e.g., LOC001)",
+                                    "enum": ["LOC001", "LOC002", "LOC003"],
+                                    "description": (
+                                        "Location identifier. "
+                                        "LOC001 = Amsterdam (IJ-tunnel, Damrak canal, A10), "
+                                        "LOC002 = Utrecht (Weerdsluis, Oudegracht canal, A12), "
+                                        "LOC003 = Rotterdam (Erasmusbrug, Nieuwe Maas, A15)."
+                                    ),
                                 }
                             },
                             "required": ["location_id"],
@@ -247,22 +277,44 @@ def handle_request(request):
                     {
                         "name": "list_roads",
                         "description": (
-                            "List all roads managed by Rijkswaterstaat. "
-                            "Returns RDF data in JSON-LD format."
+                            "List all national highways (Rijkswegen) in the database. "
+                            "USE THIS TOOL WHEN: You need to compare roads across locations, "
+                            "want road numbers and conditions, or need a roads-only overview. "
+                            "For complete infrastructure including bridges and water, use "
+                            "get_infrastructure instead. "
+                            "RETURNS: JSON-LD array with each road: locationId, roadNumber "
+                            "(A10, A12, A15), roadType (highway), condition (good/fair). "
+                            "Does NOT require parameters. Returns A10 (Amsterdam), A12 (Utrecht), "
+                            "A15 (Rotterdam)."
                         ),
                         "inputSchema": {"type": "object", "properties": {}},
                     },
                     {
                         "name": "get_water_level",
                         "description": (
-                            "Get current water level data by location ID. Returns JSON-LD format."
+                            "Retrieve current water level measurement for a specific water body. "
+                            "USE THIS TOOL WHEN: You specifically need water level data, flood "
+                            "risk assessment, or water management information. For general "
+                            "infrastructure, use get_infrastructure instead. "
+                            "RETURNS: JSON-LD with: waterType (canal/river), waterLevel "
+                            "(meters relative to NAP - Normaal Amsterdams Peil, where 0 = sea "
+                            "level; positive = above sea level, negative = below), managedBy "
+                            "(organization responsible), label (water body name). "
+                            "EXAMPLE: LOC003 (Rotterdam) Nieuwe Maas river shows -0.2m (below "
+                            "sea level, typical for river deltas)."
                         ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "description": "The location ID (e.g., LOC001)",
+                                    "enum": ["LOC001", "LOC002", "LOC003"],
+                                    "description": (
+                                        "Location identifier for water body. "
+                                        "LOC001 = Damrak canal (Amsterdam, 0.4m above NAP), "
+                                        "LOC002 = Oudegracht (Utrecht, 0.3m above NAP), "
+                                        "LOC003 = Nieuwe Maas (Rotterdam, -0.2m below NAP)."
+                                    ),
                                 }
                             },
                             "required": ["location_id"],

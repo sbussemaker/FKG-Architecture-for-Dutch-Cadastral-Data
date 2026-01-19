@@ -173,6 +173,36 @@ def list_properties():
     return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": properties}
 
 
+def find_location(query):
+    """Find locations by searching address, municipality, or postal code"""
+    query_lower = query.lower()
+    results = []
+
+    for location_uri in graph.subjects(RDF.type, GEO.Location):
+        loc_id = str(graph.value(location_uri, GEO.locationId))
+        address = str(graph.value(location_uri, GEO.address))
+        postal = str(graph.value(location_uri, GEO.postalCode))
+        municipality = str(graph.value(location_uri, GEO.municipality))
+
+        # Search in address, municipality, and postal code
+        if (
+            query_lower in address.lower()
+            or query_lower in municipality.lower()
+            or query_lower in postal.lower()
+        ):
+            results.append(
+                {
+                    "@type": "geo:Location",
+                    "geo:locationId": loc_id,
+                    "geo:address": address,
+                    "geo:postalCode": postal,
+                    "geo:municipality": municipality,
+                }
+            )
+
+    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": results}
+
+
 def handle_request(request):
     """Handle MCP JSON-RPC request"""
     method = request.get("method")
@@ -186,7 +216,19 @@ def handle_request(request):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "kadaster-service", "version": "1.0.0"},
+                "serverInfo": {
+                    "name": "kadaster-service",
+                    "version": "1.0.0",
+                    "description": (
+                        "Kadaster (Dutch Land Registry) MCP Server. "
+                        "Provides official cadastral data including property ownership, "
+                        "land registration, building information, and parcel boundaries. "
+                        "Data source: Dutch Kadaster (kadaster.nl). "
+                        "Use this service for questions about: property owners, "
+                        "building types, construction years, land use, surface areas, "
+                        "cadastral IDs, and addresses."
+                    ),
+                },
             },
         }
 
@@ -197,17 +239,52 @@ def handle_request(request):
             "result": {
                 "tools": [
                     {
+                        "name": "find_location",
+                        "description": (
+                            "Search for locations by address, city name, or postal code. "
+                            "USE THIS TOOL FIRST to find location IDs before querying property "
+                            "data. This is the discovery tool for the Kadaster database. "
+                            "RETURNS: JSON-LD array of matching locations with: locationId "
+                            "(use this ID for other tools), address, postalCode, municipality. "
+                            "EXAMPLE: find_location('Amsterdam') returns all Amsterdam "
+                            "locations with their IDs. Then use those IDs with get_property."
+                        ),
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "query": {
+                                    "type": "string",
+                                    "description": (
+                                        "Search term: city name (e.g., 'Amsterdam'), "
+                                        "street address (e.g., 'Damrak'), or postal code "
+                                        "(e.g., '1012'). Case-insensitive partial matching."
+                                    ),
+                                }
+                            },
+                            "required": ["query"],
+                        },
+                    },
+                    {
                         "name": "get_property",
                         "description": (
-                            "Get cadastral property data by location ID. "
-                            "Returns Kadaster registry data in JSON-LD format."
+                            "Retrieve detailed cadastral property information for a location. "
+                            "PREREQUISITE: First use find_location to get valid location IDs. "
+                            "USE THIS TOOL WHEN: You need property ownership details, building "
+                            "information, land use classification, or construction history. "
+                            "RETURNS: JSON-LD with: cadastralId (official Kadaster parcel ID), "
+                            "address, postalCode, municipality, owner (legal owner name), "
+                            "surfaceArea (square meters), landUse (commercial/residential/"
+                            "educational/government), buildingType, constructionYear."
                         ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "description": "The location ID (e.g., LOC001)",
+                                    "description": (
+                                        "Location identifier obtained from find_location tool. "
+                                        "Format: 'LOC' followed by digits (e.g., 'LOC001')."
+                                    ),
                                 }
                             },
                             "required": ["location_id"],
@@ -216,7 +293,12 @@ def handle_request(request):
                     {
                         "name": "list_properties",
                         "description": (
-                            "List all cadastral properties. Returns RDF data in JSON-LD format."
+                            "List ALL registered cadastral properties in the database. "
+                            "USE THIS TOOL WHEN: You need a complete overview of all properties "
+                            "or want to browse without knowing specific locations. "
+                            "RETURNS: JSON-LD array with summary for each property: "
+                            "cadastralId, locationId, address, owner, surfaceArea. "
+                            "No parameters required."
                         ),
                         "inputSchema": {"type": "object", "properties": {}},
                     },

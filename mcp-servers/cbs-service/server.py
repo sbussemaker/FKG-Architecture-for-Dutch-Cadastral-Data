@@ -141,7 +141,19 @@ def handle_request(request):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "cbs-service", "version": "1.0.0"},
+                "serverInfo": {
+                    "name": "cbs-service",
+                    "version": "1.0.0",
+                    "description": (
+                        "CBS (Centraal Bureau voor de Statistiek / Statistics Netherlands) "
+                        "MCP Server. Provides official Dutch statistical data including "
+                        "population counts, household statistics, income data, and economic "
+                        "indicators. Data source: CBS StatLine (cbs.nl). "
+                        "Use this service for questions about: population numbers, "
+                        "demographics, household counts, average income, unemployment rates, "
+                        "and population density."
+                    ),
+                },
             },
         }
 
@@ -154,15 +166,29 @@ def handle_request(request):
                     {
                         "name": "get_statistics",
                         "description": (
-                            "Get statistical data by location ID. "
-                            "Returns CBS demographic data in JSON-LD format."
+                            "Retrieve comprehensive statistical data for a municipality from "
+                            "CBS (Statistics Netherlands). "
+                            "USE THIS TOOL WHEN: You need population numbers, income statistics, "
+                            "unemployment data, or population density for a specific location. "
+                            "RETURNS: JSON-LD with fields: municipality (city name), "
+                            "population (total inhabitants as integer), households (number of "
+                            "households), averageIncome (in EUR per year), populationDensity "
+                            "(inhabitants per km²), unemploymentRate (percentage). "
+                            "EXAMPLE: For LOC001 (Amsterdam), returns population 872,680, "
+                            "465,242 households, avg income €38,500, density 5,135/km²."
                         ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "description": "The location ID (e.g., LOC001)",
+                                    "enum": ["LOC001", "LOC002", "LOC003"],
+                                    "description": (
+                                        "Location identifier for the municipality. "
+                                        "LOC001 = Amsterdam (largest city, 872K population), "
+                                        "LOC002 = Utrecht (fourth largest, 362K population), "
+                                        "LOC003 = Rotterdam (second largest, 651K population)."
+                                    ),
                                 }
                             },
                             "required": ["location_id"],
@@ -171,23 +197,39 @@ def handle_request(request):
                     {
                         "name": "list_locations",
                         "description": (
-                            "List all locations with population data. "
-                            "Returns RDF data in JSON-LD format."
+                            "List all municipalities with basic population data. "
+                            "USE THIS TOOL WHEN: You need to compare populations across cities, "
+                            "find which locations are available, or get a quick overview of "
+                            "all municipalities in the database. "
+                            "RETURNS: JSON-LD array with summary for each location: "
+                            "locationId, municipality name, population count. "
+                            "Does NOT require any parameters. Returns data for Amsterdam, "
+                            "Utrecht, and Rotterdam."
                         ),
                         "inputSchema": {"type": "object", "properties": {}},
                     },
                     {
                         "name": "get_demographics",
                         "description": (
-                            "Get detailed demographic breakdown by location ID. "
-                            "Returns JSON-LD format."
+                            "Retrieve household-focused demographic data with derived statistics. "
+                            "USE THIS TOOL WHEN: You specifically need household size information "
+                            "or want population-to-household ratios. For general statistics, "
+                            "use get_statistics instead. "
+                            "RETURNS: JSON-LD with fields: municipality, population, households, "
+                            "averageHouseholdSize (calculated: population/households). "
+                            "EXAMPLE: For LOC001 (Amsterdam), returns avg household size of 1.88 "
+                            "(872,680 people / 465,242 households)."
                         ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "description": "The location ID (e.g., LOC001)",
+                                    "enum": ["LOC001", "LOC002", "LOC003"],
+                                    "description": (
+                                        "Location identifier. "
+                                        "LOC001 = Amsterdam, LOC002 = Utrecht, LOC003 = Rotterdam."
+                                    ),
                                 }
                             },
                             "required": ["location_id"],
