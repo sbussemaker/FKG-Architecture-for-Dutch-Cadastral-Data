@@ -1,7 +1,36 @@
 #!/usr/bin/env python3
 """
 Kadaster Service MCP Server
-Dutch Land Registry - Cadastral data, property boundaries, and ownership information
+===========================
+
+Data Source: Dutch Land Registry (Kadaster - kadaster.nl)
+
+Purpose:
+    Provides cadastral data including property ownership, land registration,
+    building information, and parcel boundaries for locations in the Netherlands.
+
+Ontology (RDF Namespace: http://example.org/geospatial#):
+    - geo:Location: Geographic location with address information
+        - geo:locationId: Unique identifier (e.g., "LOC001")
+        - geo:address: Street address
+        - geo:postalCode: Dutch postal code format (e.g., "1012 LG")
+        - geo:municipality: Municipality/city name
+
+    - geo:Property: Cadastral property record
+        - geo:cadastralId: Official Kadaster parcel ID (e.g., "AMS01-G-1234")
+        - geo:locationId: Links to corresponding Location
+        - geo:owner: Legal owner (person, company, or government entity)
+        - geo:surfaceArea: Property area in square meters (xsd:decimal)
+        - geo:landUse: Classification (commercial/residential/educational/government)
+        - geo:buildingType: Type of building (office/university/municipal_building/etc.)
+        - geo:constructionYear: Year the building was constructed (xsd:integer)
+
+Tool Discovery Pattern:
+    1. Use find_location(query) to search by address, city, or postal code
+    2. Get locationId from results
+    3. Use get_property(location_id) for detailed property information
+
+Response Format: JSON-LD with @context for semantic interoperability
 """
 
 import json
@@ -337,6 +366,33 @@ def handle_request(request):
 
         elif tool_name == "list_properties":
             result = list_properties()
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
+            }
+
+        elif tool_name == "find_location":
+            query = tool_args.get("query", "")
+            result = find_location(query)
+
+            if not result.get("@graph"):
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    f"No locations found matching '{query}'. "
+                                    "Try searching by city name, address, or postal code."
+                                ),
+                            }
+                        ],
+                    },
+                }
+
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,

@@ -341,7 +341,8 @@
                         <select id="tool-select">
                             <option value="">Select a tool...</option>
                         </select>
-                        <textarea id="args-input" placeholder='Arguments (JSON): {"location_id": "LOC001"} or {"question": "What is the population?"}' style="width: 100%; min-height: 50px; padding: 8px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 13px; font-family: inherit; resize: vertical;"></textarea>
+                        <div id="tool-description" style="font-size: 11px; color: #4a5568; padding: 8px; background: #f7fafc; border-radius: 4px; max-height: 80px; overflow-y: auto; line-height: 1.4;">Select a tool to see its description</div>
+                        <textarea id="args-input" placeholder='Arguments (JSON): {"query": "Amsterdam"} or {"location_id": "LOC001"}' style="width: 100%; min-height: 60px; padding: 8px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 12px; font-family: monospace; resize: vertical;"></textarea>
                         <button class="btn-query" onclick="executeQuery()">Execute Query</button>
                     </div>
                     <div id="results" class="results"></div>
@@ -381,32 +382,73 @@
     <script>
         const API_BASE = 'http://localhost:5000/api';
         let services = [];
-        let serviceTools = {
-            'kadaster-service': [
-                {name: 'list_properties', args: {}},
-                {name: 'get_property', args: {location_id: 'LOC001'}}
-            ],
-            'cbs-service': [
-                {name: 'list_locations', args: {}},
-                {name: 'get_statistics', args: {location_id: 'LOC001'}},
-                {name: 'get_demographics', args: {location_id: 'LOC001'}}
-            ],
-            'rijkswaterstaat-service': [
-                {name: 'list_roads', args: {}},
-                {name: 'get_infrastructure', args: {location_id: 'LOC001'}},
-                {name: 'get_water_level', args: {location_id: 'LOC001'}}
-            ],
-            'agent-service': [
-                {name: 'ask_question', args: {question: 'What is the population of Amsterdam?'}}
-            ]
-        };
+        let serviceTools = {}; // Dynamically populated from API
 
-        async function loadServices() {
+        // Generate example arguments from tool input schema
+        function generateExampleArgs(inputSchema) {
+            if (!inputSchema || !inputSchema.properties) {
+                return {};
+            }
+
+            const args = {};
+            const props = inputSchema.properties;
+
+            for (const [key, schema] of Object.entries(props)) {
+                // Check if there's an enum with examples
+                if (schema.enum && schema.enum.length > 0) {
+                    args[key] = schema.enum[0];
+                } else if (key === 'query') {
+                    args[key] = 'Amsterdam';
+                } else if (key === 'location_id') {
+                    args[key] = 'LOC001';
+                } else if (key === 'question') {
+                    args[key] = 'What is the population of Amsterdam?';
+                } else if (schema.type === 'string') {
+                    args[key] = '';
+                } else if (schema.type === 'number' || schema.type === 'integer') {
+                    args[key] = 0;
+                } else if (schema.type === 'boolean') {
+                    args[key] = false;
+                }
+            }
+
+            return args;
+        }
+
+        // Load tools dynamically from running services
+        async function loadServiceTools() {
+            try {
+                const response = await fetch(`${API_BASE}/services`);
+                const runningServices = await response.json();
+
+                // Build serviceTools from API response
+                serviceTools = {};
+                for (const service of runningServices) {
+                    serviceTools[service.name] = service.tools.map(tool => ({
+                        name: tool.name,
+                        description: tool.description || '',
+                        inputSchema: tool.inputSchema || {},
+                        args: generateExampleArgs(tool.inputSchema)
+                    }));
+                }
+
+                console.log('Loaded tools from API:', serviceTools);
+                updateServiceSelect();
+            } catch (error) {
+                console.error('Error loading service tools:', error);
+            }
+        }
+
+        async function loadServices(includeTools = false) {
             try {
                 const response = await fetch(`${API_BASE}/services/all`);
                 services = await response.json();
                 renderServices();
                 updateServiceSelect();
+                // Only load tools on initial load
+                if (includeTools) {
+                    await loadServiceTools();
+                }
             } catch (error) {
                 console.error('Error loading services:', error);
             }
@@ -535,35 +577,38 @@
         function updateServiceSelect() {
             const select = document.getElementById('service-select');
             const toolSelect = document.getElementById('tool-select');
+            const toolDescription = document.getElementById('tool-description');
             const currentValue = select.value; // Preserve current selection
             const currentTool = toolSelect.value; // Preserve tool selection
+            const currentDescription = toolDescription ? toolDescription.textContent : ''; // Preserve description
 
             select.innerHTML = '<option value="">Select a service...</option>';
             services.forEach(service => {
                 const option = document.createElement('option');
                 option.value = service.name;
-                option.textContent = service.display_name;
+                // Show indicator if service has tools loaded
+                const hasTools = serviceTools[service.name] && serviceTools[service.name].length > 0;
+                const toolCount = hasTools ? ` (${serviceTools[service.name].length} tools)` : ' (not running)';
+                option.textContent = service.display_name + toolCount;
+                option.disabled = !hasTools;
                 select.appendChild(option);
             });
             select.value = currentValue; // Restore selection
 
-            // Repopulate tools if a service was selected
+            // Repopulate tools if a service was selected (but don't reset description)
             if (currentValue && serviceTools[currentValue]) {
-                toolSelect.innerHTML = '<option value="">Select a tool...</option>';
-                serviceTools[currentValue].forEach(tool => {
-                    const option = document.createElement('option');
-                    option.value = tool.name;
-                    option.textContent = tool.name;
-                    option.dataset.args = JSON.stringify(tool.args);
-                    toolSelect.appendChild(option);
-                });
+                populateToolSelect(currentValue, true); // skipDescriptionReset = true
                 toolSelect.value = currentTool; // Restore tool selection
+                // Restore description if a tool was selected
+                if (currentTool && currentDescription && toolDescription) {
+                    toolDescription.textContent = currentDescription;
+                }
             }
         }
 
-        document.getElementById('service-select').addEventListener('change', (e) => {
-            const serviceName = e.target.value;
+        function populateToolSelect(serviceName, skipDescriptionReset = false) {
             const toolSelect = document.getElementById('tool-select');
+            const toolDescription = document.getElementById('tool-description');
             toolSelect.innerHTML = '<option value="">Select a tool...</option>';
 
             if (serviceName && serviceTools[serviceName]) {
@@ -572,15 +617,42 @@
                     option.value = tool.name;
                     option.textContent = tool.name;
                     option.dataset.args = JSON.stringify(tool.args);
+                    option.dataset.description = tool.description || '';
                     toolSelect.appendChild(option);
                 });
             }
+
+            // Clear description when service changes (unless skipped during refresh)
+            if (toolDescription && !skipDescriptionReset) {
+                toolDescription.textContent = 'Select a tool to see its description';
+            }
+        }
+
+        document.getElementById('service-select').addEventListener('change', (e) => {
+            const serviceName = e.target.value;
+            populateToolSelect(serviceName);
+            document.getElementById('args-input').value = '';
         });
 
         document.getElementById('tool-select').addEventListener('change', (e) => {
             const selected = e.target.selectedOptions[0];
+            const toolDescription = document.getElementById('tool-description');
+
             if (selected && selected.dataset.args) {
-                document.getElementById('args-input').value = selected.dataset.args;
+                // Format args nicely
+                try {
+                    const args = JSON.parse(selected.dataset.args);
+                    document.getElementById('args-input').value = JSON.stringify(args, null, 2);
+                } catch {
+                    document.getElementById('args-input').value = selected.dataset.args;
+                }
+            }
+
+            // Update tool description
+            if (toolDescription && selected && selected.dataset.description) {
+                toolDescription.textContent = selected.dataset.description;
+            } else if (toolDescription) {
+                toolDescription.textContent = 'No description available';
             }
         });
 
@@ -692,10 +764,11 @@
             });
         }
 
-        // Initialize
-        loadServices();
+        // Initialize - load services with tools on first load
+        loadServices(true);
         setOntologyURL();
-        setInterval(loadServices, 5000);
+        // Refresh service status every 5 seconds (without reloading tools)
+        setInterval(() => loadServices(false), 5000);
 
         // Redraw connections on window resize
         window.addEventListener('resize', drawConnections);

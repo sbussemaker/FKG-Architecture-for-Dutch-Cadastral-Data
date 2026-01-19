@@ -1,12 +1,45 @@
 #!/usr/bin/env python3
 """
 AI Agent MCP Server
+===================
 
 This is a meta-MCP-server that acts as both an MCP server (exposing tools to clients)
 and an MCP client (querying other MCP servers like Kadaster, CBS, Rijkswaterstaat).
 
 It uses Azure OpenAI to understand natural language questions and intelligently query
 the appropriate backend services.
+
+Architecture:
+    [Client] --> [Agent Service] --> [Azure OpenAI]
+                       |
+                       +--> [Kadaster Service]
+                       +--> [CBS Service]
+                       +--> [Rijkswaterstaat Service]
+
+Tool Chaining Workflow:
+    When the agent receives a question about a location (e.g., "What is the population
+    of Amsterdam?"), it follows this workflow:
+
+    1. LOCATION DISCOVERY: First calls find_location(query="Amsterdam") on one of
+       the backend services to get the location identifier (e.g., "LOC001")
+
+    2. DATA RETRIEVAL: Uses the discovered location_id to query relevant services:
+       - Kadaster: get_property(location_id="LOC001") for property data
+       - CBS: get_statistics(location_id="LOC001") for demographics
+       - Rijkswaterstaat: get_infrastructure(location_id="LOC001") for infrastructure
+
+    3. RESPONSE SYNTHESIS: Combines data from multiple sources into a coherent answer
+       with citations indicating the source of each piece of information
+
+Cross-Service Linking:
+    The geo:locationId is consistent across all services, enabling the agent to combine
+    data from different government agencies for the same geographic location. This is
+    the key to achieving "Virtual Knowledge Graph" capabilities without requiring a
+    centralized knowledge graph infrastructure.
+
+Response Format:
+    All backend services return JSON-LD with @context for semantic interoperability,
+    allowing the agent to understand the structure and meaning of the data.
 """
 
 import json
@@ -199,23 +232,43 @@ def get_backend_tools() -> list[dict[str, Any]]:
         # Extract tool names for the enum
         tool_names = [tool["name"] for tool in discovered_tools]
 
+        # Build tool descriptions for the wrapper
+        tool_descriptions = []
+        for tool in discovered_tools:
+            tool_descriptions.append(f"- {tool['name']}: {tool['description'][:100]}...")
+
         # Create a wrapper tool for this service
         wrapper_tool = {
             "name": service_name,
-            "description": service_desc,
+            "description": (
+                f"{service_desc}\n\n"
+                f"Available tools in {service_name}:\n" + "\n".join(tool_descriptions)
+            ),
             "input_schema": {
                 "type": "object",
                 "properties": {
                     "tool": {
                         "type": "string",
                         "enum": tool_names,
-                        "description": f"The {service_name} tool to call",
+                        "description": (
+                            f"The {service_name} tool to call. "
+                            "Use 'find_location' first to discover location IDs, "
+                            "then use other tools with the discovered location_id."
+                        ),
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": (
+                            "Search query for find_location tool. "
+                            "Use city name (e.g., 'Amsterdam'), address, or postal code. "
+                            "Required when tool='find_location'."
+                        ),
                     },
                     "location_id": {
                         "type": "string",
                         "description": (
-                            "Location ID (LOC001=Amsterdam, LOC002=Utrecht, "
-                            "LOC003=Rotterdam). Required for most tools."
+                            "Location identifier obtained from find_location "
+                            "(e.g., 'LOC001'). Required for tools other than find_location."
                         ),
                     },
                 },
@@ -348,6 +401,36 @@ def convert_tools_to_openai_format(tools: list[dict[str, Any]]) -> list[ChatComp
     return openai_tools
 
 
+def build_tool_arguments(mcp_tool: str, tool_input: dict[str, Any]) -> dict[str, Any]:
+    """
+    Build the appropriate arguments for a backend MCP tool call.
+
+    Args:
+        mcp_tool: The name of the MCP tool being called
+        tool_input: The input parameters from the AI model
+
+    Returns:
+        Dictionary of arguments to pass to the MCP tool
+    """
+    arguments: dict[str, Any] = {}
+
+    # find_location tools use 'query' parameter
+    if mcp_tool == "find_location":
+        if "query" in tool_input:
+            arguments["query"] = tool_input["query"]
+        else:
+            # Fallback: if no query but location_id is provided, use it as query
+            # This helps if the AI model gets confused
+            if "location_id" in tool_input:
+                arguments["query"] = tool_input["location_id"]
+    else:
+        # All other tools use 'location_id' parameter
+        if "location_id" in tool_input:
+            arguments["location_id"] = tool_input["location_id"]
+
+    return arguments
+
+
 def execute_backend_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
     """Execute a backend MCP tool"""
 
@@ -369,9 +452,7 @@ def execute_backend_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str
 
         cache_entry = _BACKEND_TOOLS_CACHE[service_name]
         container_name = cache_entry["container"]
-        arguments = (
-            {"location_id": tool_input.get("location_id")} if "location_id" in tool_input else {}
-        )
+        arguments = build_tool_arguments(mcp_tool, tool_input)
 
     else:
         # Standard wrapper tool format
@@ -385,9 +466,9 @@ def execute_backend_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str
             return {"error": f"Missing 'tool' parameter in tool_input: {tool_input}"}
 
         mcp_tool = tool_input["tool"]
-        arguments = (
-            {"location_id": tool_input.get("location_id")} if "location_id" in tool_input else {}
-        )
+        arguments = build_tool_arguments(mcp_tool, tool_input)
+
+    logger.info(f"Calling {container_name} > {mcp_tool} with arguments: {arguments}")
 
     # Call the backend MCP service
     result = call_mcp_service(container_name, mcp_tool, arguments)
@@ -421,30 +502,40 @@ def ask_question(question: str) -> str:
                 "- CBS (Statistics Netherlands): Demographics, population, income statistics\n"
                 "- Rijkswaterstaat (Infrastructure & Water): Roads, bridges, canals, "
                 "water levels\n\n"
-                "Available locations:\n"
-                "- LOC001: Amsterdam (Damrak 1)\n"
-                "- LOC002: Utrecht (Oudegracht 231)\n"
-                "- LOC003: Rotterdam (Coolsingel 40)\n\n"
+                "LOCATION DISCOVERY WORKFLOW (MANDATORY):\n"
+                "When a user asks about a location (city, address, etc.), you MUST:\n"
+                "1. FIRST call find_location with the location name to get the location ID\n"
+                "   Example: To find Amsterdam, call the Kadaster tool with "
+                '{"tool": "find_location", "query": "Amsterdam"}\n'
+                "2. Extract the locationId from the response (e.g., 'LOC001')\n"
+                "3. THEN use that locationId with other tools to get detailed data\n"
+                "   Example: Call CBS with "
+                '{"tool": "get_statistics", "location_id": "LOC001"}\n\n'
+                "Each service has its own find_location tool that returns location IDs.\n"
+                "The locationId is SHARED across all services - LOC001 in Kadaster refers "
+                "to the same place as LOC001 in CBS and Rijkswaterstaat.\n\n"
                 "CRITICAL RULES:\n"
-                "1. You MUST use the available tools to gather all information\n"
-                "2. You MUST NOT make guesses or use general knowledge to answer questions\n"
-                "3. You MUST ONLY answer based on data returned from the tools\n"
-                "4. If a tool call fails or returns an error, inform the user that the "
+                "1. You MUST use find_location FIRST to discover location IDs\n"
+                "2. You MUST NOT assume or hardcode location IDs\n"
+                "3. You MUST use the available tools to gather all information\n"
+                "4. You MUST NOT make guesses or use general knowledge to answer questions\n"
+                "5. You MUST ONLY answer based on data returned from the tools\n"
+                "6. If a tool call fails or returns an error, inform the user that the "
                 "data is unavailable\n"
-                "5. If you cannot get data from the tools, say so explicitly - do NOT "
+                "7. If you cannot get data from the tools, say so explicitly - do NOT "
                 "provide approximations or guesses\n"
-                '6. NEVER use phrases like "approximately", "based on latest data", '
+                '8. NEVER use phrases like "approximately", "based on latest data", '
                 '"prior to", or "around" unless that data came from a tool\n'
-                "7. If tools don't return data, respond with: "
+                "9. If tools don't return data, respond with: "
                 '"I was unable to retrieve that information from the available data sources."\n\n'
                 "CITATION REQUIREMENTS:\n"
-                "8. For EACH piece of information in your answer, you MUST cite the "
+                "10. For EACH piece of information in your answer, you MUST cite the "
                 "source tool that provided it\n"
-                '9. Use this format: "- **Field Name**: Value '
+                '11. Use this format: "- **Field Name**: Value '
                 '(Source: ServiceName > tool_name)"\n'
-                '10. Example: "- **Owner**: Gemeente Amsterdam '
-                '(Source: Kadaster > get_property_details)"\n'
-                "11. If multiple tools provided related information, cite all relevant sources\n\n"
+                '12. Example: "- **Owner**: Gemeente Amsterdam '
+                '(Source: Kadaster > get_property)"\n'
+                "13. If multiple tools provided related information, cite all relevant sources\n\n"
                 "Your answers must be based EXCLUSIVELY on tool results. No exceptions."
             ),
         },

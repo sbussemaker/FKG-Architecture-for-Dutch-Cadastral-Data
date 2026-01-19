@@ -1,7 +1,60 @@
 #!/usr/bin/env python3
 """
 Rijkswaterstaat Service MCP Server
-Ministry of Infrastructure and Water Management - Infrastructure and water data
+==================================
+
+Data Source: Rijkswaterstaat (Dutch Ministry of Infrastructure and Water Management -
+rijkswaterstaat.nl)
+
+Purpose:
+    Provides data on Dutch national infrastructure including highways (Rijkswegen),
+    bridges, tunnels, locks, canals, rivers, and water level measurements.
+
+Ontology (RDF Namespace: http://example.org/geospatial#):
+    - geo:Location: Geographic location with administrative data
+        - geo:locationId: Unique identifier (e.g., "LOC001")
+        - geo:municipality: Municipality/city name
+        - geo:province: Dutch province (Noord-Holland, Utrecht, Zuid-Holland, etc.)
+
+    - geo:Infrastructure: Physical infrastructure objects
+        - geo:locationId: Links to corresponding Location
+        - geo:infrastructureType: Type classification (bridge/tunnel/lock)
+        - geo:condition: Maintenance status (good/fair/poor)
+        - geo:managedBy: Responsible organization
+        - rdfs:label: Descriptive name (e.g., "IJ-tunnel entrance")
+
+    - geo:WaterBody: Water features (canals, rivers)
+        - geo:locationId: Links to corresponding Location
+        - geo:waterType: Classification (canal/river)
+        - geo:waterLevel: Height in meters relative to NAP (xsd:decimal)
+        - geo:managedBy: Water authority (Rijkswaterstaat/Waternet/Hoogheemraadschap)
+        - rdfs:label: Name of water body
+
+    - geo:Road: Highway/road data
+        - geo:locationId: Links to corresponding Location
+        - geo:roadType: Classification (highway)
+        - geo:roadNumber: Official designation (e.g., "A10", "A12")
+        - geo:maxSpeed: Speed limit in km/h (xsd:integer)
+        - geo:condition: Maintenance status (good/fair/poor)
+
+Reference Datum:
+    NAP (Normaal Amsterdams Peil) = Dutch vertical reference datum
+    - 0 = approximate sea level at Amsterdam
+    - Positive values = above sea level
+    - Negative values = below sea level (common in polders and river deltas)
+
+Tool Discovery Pattern:
+    1. Use find_location(query) to search by municipality or province
+    2. Get locationId from results (also shows infrastructure/water counts)
+    3. Use get_infrastructure(location_id) for complete overview, or
+       get_water_level(location_id) for water-specific data
+
+Cross-Service Linking:
+    The geo:locationId is consistent across all MCP services (Kadaster, CBS,
+    Rijkswaterstaat), enabling queries that combine property data, statistics,
+    and infrastructure for the same geographic location.
+
+Response Format: JSON-LD with @context for semantic interoperability
 """
 
 import json
@@ -20,6 +73,21 @@ graph.bind("geo", GEO)
 
 # Add sample Rijkswaterstaat data (infrastructure and water management)
 def init_data():
+    # Locations with their metadata (for find_location tool)
+    locations = [
+        # (locationId, municipality, province)
+        ("LOC001", "Amsterdam", "Noord-Holland"),
+        ("LOC002", "Utrecht", "Utrecht"),
+        ("LOC003", "Rotterdam", "Zuid-Holland"),
+    ]
+
+    for loc_id, municipality, province in locations:
+        location_uri = URIRef(f"http://example.org/locations/{loc_id}")
+        graph.add((location_uri, RDF.type, GEO.Location))
+        graph.add((location_uri, GEO.locationId, Literal(loc_id)))
+        graph.add((location_uri, GEO.municipality, Literal(municipality)))
+        graph.add((location_uri, GEO.province, Literal(province)))
+
     # Infrastructure near locations
     infrastructure = [
         # (locationId, infraId, infraType, condition, managedBy, description)
@@ -76,6 +144,48 @@ def init_data():
 
 
 init_data()
+
+
+def find_location(query):
+    """Find locations by searching municipality name, province, or location ID"""
+    query_lower = query.lower()
+    results = []
+
+    for location_uri in graph.subjects(RDF.type, GEO.Location):
+        loc_id = str(graph.value(location_uri, GEO.locationId))
+        municipality = str(graph.value(location_uri, GEO.municipality))
+        province = str(graph.value(location_uri, GEO.province))
+
+        # Search in municipality, province, and location ID
+        if (
+            query_lower in municipality.lower()
+            or query_lower in province.lower()
+            or query_lower in loc_id.lower()
+        ):
+            # Get infrastructure summary for this location
+            infra_count = sum(
+                1
+                for uri in graph.subjects(RDF.type, GEO.Infrastructure)
+                if str(graph.value(uri, GEO.locationId)) == loc_id
+            )
+            water_count = sum(
+                1
+                for uri in graph.subjects(RDF.type, GEO.WaterBody)
+                if str(graph.value(uri, GEO.locationId)) == loc_id
+            )
+
+            results.append(
+                {
+                    "@type": "geo:Location",
+                    "geo:locationId": loc_id,
+                    "geo:municipality": municipality,
+                    "geo:province": province,
+                    "summary:infrastructureCount": infra_count,
+                    "summary:waterBodyCount": water_count,
+                }
+            )
+
+    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": results}
 
 
 def get_infrastructure(location_id):
@@ -240,34 +350,65 @@ def handle_request(request):
             "result": {
                 "tools": [
                     {
+                        "name": "find_location",
+                        "description": (
+                            "Search for locations by municipality name or province to get their "
+                            "location identifiers and infrastructure summary. "
+                            "USE THIS TOOL FIRST when you don't know the location ID. "
+                            "This is the discovery tool for the Rijkswaterstaat database. "
+                            "WORKFLOW: Call find_location('Amsterdam') to get LOC001 and see "
+                            "what infrastructure exists, then use that ID with get_infrastructure "
+                            "or get_water_level for details. "
+                            "RETURNS: JSON-LD array of matching locations with: locationId, "
+                            "municipality, province, infrastructureCount, waterBodyCount. "
+                            "SEARCH EXAMPLES: 'Amsterdam' returns LOC001 (Noord-Holland), "
+                            "'Utrecht' returns LOC002, 'Zuid-Holland' returns Rotterdam (LOC003). "
+                            "Partial matches work: 'dam' matches Amsterdam."
+                        ),
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "query": {
+                                    "type": "string",
+                                    "description": (
+                                        "Search term: municipality/city name (e.g., 'Amsterdam'), "
+                                        "province name (e.g., 'Noord-Holland'), or partial name. "
+                                        "Case-insensitive partial matching."
+                                    ),
+                                }
+                            },
+                            "required": ["query"],
+                        },
+                    },
+                    {
                         "name": "get_infrastructure",
                         "description": (
                             "Retrieve ALL infrastructure data for a location: roads, bridges, "
                             "tunnels, locks, AND water bodies. Most comprehensive tool. "
+                            "PREREQUISITE: First use find_location to get valid location IDs. "
                             "USE THIS TOOL WHEN: You need a complete infrastructure overview, "
                             "want to know what bridges/tunnels exist, or need combined road and "
                             "water data for a location. "
                             "RETURNS: JSON-LD with three types of objects: "
                             "(1) Infrastructure: infrastructureType (bridge/tunnel/lock), "
-                            "condition (good/fair/poor), managedBy, label (name). "
+                            "condition (good/fair/poor), managedBy (responsible organization), "
+                            "label (descriptive name). "
                             "(2) WaterBody: waterType (canal/river), waterLevel (meters relative "
-                            "to NAP), managedBy, label. "
-                            "(3) Road: roadType (highway), roadNumber (e.g., A10), maxSpeed, "
-                            "condition. "
-                            "EXAMPLE: For LOC001 (Amsterdam), returns IJ-tunnel (bridge), "
-                            "Damrak canal (water level 0.4m), and A10 highway."
+                            "to NAP - Normaal Amsterdams Peil, Dutch reference datum), managedBy, "
+                            "label. "
+                            "(3) Road: roadType, roadNumber (e.g., A10), maxSpeed, condition. "
+                            "DATA SEMANTICS: All objects linked via geo:locationId. Water levels "
+                            "use NAP (0 = sea level at Amsterdam). "
+                            "EXAMPLE: LOC001 returns IJ-tunnel (bridge), Damrak canal, A10."
                         ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "enum": ["LOC001", "LOC002", "LOC003"],
                                     "description": (
-                                        "Location identifier. "
-                                        "LOC001 = Amsterdam (IJ-tunnel, Damrak canal, A10), "
-                                        "LOC002 = Utrecht (Weerdsluis, Oudegracht canal, A12), "
-                                        "LOC003 = Rotterdam (Erasmusbrug, Nieuwe Maas, A15)."
+                                        "Location identifier obtained from find_location. "
+                                        "Format: 'LOC' followed by digits (e.g., 'LOC001')."
                                     ),
                                 }
                             },
@@ -277,15 +418,14 @@ def handle_request(request):
                     {
                         "name": "list_roads",
                         "description": (
-                            "List all national highways (Rijkswegen) in the database. "
+                            "List ALL national highways (Rijkswegen) in the database. "
                             "USE THIS TOOL WHEN: You need to compare roads across locations, "
-                            "want road numbers and conditions, or need a roads-only overview. "
-                            "For complete infrastructure including bridges and water, use "
-                            "get_infrastructure instead. "
+                            "want road numbers and conditions, or need a roads-only overview "
+                            "without knowing specific locations. "
+                            "ALTERNATIVE TO: find_location + get_infrastructure (use this when "
+                            "you only care about roads and want all of them). "
                             "RETURNS: JSON-LD array with each road: locationId, roadNumber "
-                            "(A10, A12, A15), roadType (highway), condition (good/fair). "
-                            "Does NOT require parameters. Returns A10 (Amsterdam), A12 (Utrecht), "
-                            "A15 (Rotterdam)."
+                            "(e.g., A10, A12, A15), roadType, condition. No parameters required."
                         ),
                         "inputSchema": {"type": "object", "properties": {}},
                     },
@@ -293,27 +433,26 @@ def handle_request(request):
                         "name": "get_water_level",
                         "description": (
                             "Retrieve current water level measurement for a specific water body. "
+                            "PREREQUISITE: First use find_location to get valid location IDs. "
                             "USE THIS TOOL WHEN: You specifically need water level data, flood "
-                            "risk assessment, or water management information. For general "
-                            "infrastructure, use get_infrastructure instead. "
+                            "risk assessment, or water management information. For complete "
+                            "infrastructure including roads and bridges, use get_infrastructure. "
                             "RETURNS: JSON-LD with: waterType (canal/river), waterLevel "
-                            "(meters relative to NAP - Normaal Amsterdams Peil, where 0 = sea "
-                            "level; positive = above sea level, negative = below), managedBy "
-                            "(organization responsible), label (water body name). "
+                            "(meters relative to NAP, where 0 = sea level), managedBy "
+                            "(Rijkswaterstaat, Waternet, or Hoogheemraadschap), label. "
+                            "DATA SEMANTICS: NAP is the Dutch vertical reference datum. "
+                            "Negative values common in river deltas and polders. "
                             "EXAMPLE: LOC003 (Rotterdam) Nieuwe Maas river shows -0.2m (below "
-                            "sea level, typical for river deltas)."
+                            "sea level, typical for river deltas in the Netherlands)."
                         ),
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "location_id": {
                                     "type": "string",
-                                    "enum": ["LOC001", "LOC002", "LOC003"],
                                     "description": (
-                                        "Location identifier for water body. "
-                                        "LOC001 = Damrak canal (Amsterdam, 0.4m above NAP), "
-                                        "LOC002 = Oudegracht (Utrecht, 0.3m above NAP), "
-                                        "LOC003 = Nieuwe Maas (Rotterdam, -0.2m below NAP)."
+                                        "Location identifier obtained from find_location. "
+                                        "Format: 'LOC' followed by digits."
                                     ),
                                 }
                             },
@@ -328,7 +467,35 @@ def handle_request(request):
         tool_name = params.get("name")
         tool_args = params.get("arguments", {})
 
-        if tool_name == "get_infrastructure":
+        if tool_name == "find_location":
+            query = tool_args.get("query", "")
+            result = find_location(query)
+
+            if not result.get("@graph"):
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    f"No locations found matching '{query}'. "
+                                    "Try searching by city name (Amsterdam, Utrecht, Rotterdam) "
+                                    "or province (Noord-Holland, Utrecht, Zuid-Holland)."
+                                ),
+                            }
+                        ],
+                    },
+                }
+
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
+            }
+
+        elif tool_name == "get_infrastructure":
             location_id = tool_args.get("location_id")
             result = get_infrastructure(location_id)
 
