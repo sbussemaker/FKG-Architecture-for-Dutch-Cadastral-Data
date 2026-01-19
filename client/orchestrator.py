@@ -72,17 +72,41 @@ class ServiceConfig(TypedDict, total=False):
 
 # Service definitions
 SERVICES: dict[str, ServiceConfig] = {
-    "kadaster-service": {
-        "name": "kadaster-service",
-        "display_name": "Kadaster",
-        "description": "Dutch Land Registry - Cadastral data",
-        "image": "eai-kadaster-service",
-        "build_path": "../mcp-servers/kadaster-service",
+    "bag-service": {
+        "name": "bag-service",
+        "display_name": "BAG",
+        "description": "Addresses & Buildings (Basisregistratie Adressen en Gebouwen)",
+        "image": "eai-bag-service",
+        "build_path": "../mcp-servers/bag-service",
         "dockerfile": "../Dockerfile.shared",
-        "container_name": "eai-kadaster-service",
+        "container_name": "eai-bag-service",
         "status": "stopped",
-        "rdf_entities": ["Property", "Location"],
+        "rdf_entities": ["Address", "Building"],
         "position": {"x": 50, "y": 50},
+    },
+    "bgt-service": {
+        "name": "bgt-service",
+        "display_name": "BGT",
+        "description": "Large-Scale Topography (Basisregistratie Grootschalige Topografie)",
+        "image": "eai-bgt-service",
+        "build_path": "../mcp-servers/bgt-service",
+        "dockerfile": "../Dockerfile.shared",
+        "container_name": "eai-bgt-service",
+        "status": "stopped",
+        "rdf_entities": ["TopographicArea", "Road", "WaterBody"],
+        "position": {"x": 300, "y": 50},
+    },
+    "brt-service": {
+        "name": "brt-service",
+        "display_name": "BRT",
+        "description": "Topographic Maps (Basisregistratie Topografie)",
+        "image": "eai-brt-service",
+        "build_path": "../mcp-servers/brt-service",
+        "dockerfile": "../Dockerfile.shared",
+        "container_name": "eai-brt-service",
+        "status": "stopped",
+        "rdf_entities": ["GeographicName", "AdministrativeBoundary", "LandscapeFeature"],
+        "position": {"x": 50, "y": 300},
     },
     "cbs-service": {
         "name": "cbs-service",
@@ -94,7 +118,7 @@ SERVICES: dict[str, ServiceConfig] = {
         "container_name": "eai-cbs-service",
         "status": "stopped",
         "rdf_entities": ["Municipality", "Statistics"],
-        "position": {"x": 300, "y": 50},
+        "position": {"x": 550, "y": 50},
     },
     "rijkswaterstaat-service": {
         "name": "rijkswaterstaat-service",
@@ -106,7 +130,7 @@ SERVICES: dict[str, ServiceConfig] = {
         "container_name": "eai-rijkswaterstaat-service",
         "status": "stopped",
         "rdf_entities": ["Infrastructure", "WaterBody", "Road"],
-        "position": {"x": 550, "y": 50},
+        "position": {"x": 550, "y": 300},
     },
     "agent-service": {
         "name": "agent-service",
