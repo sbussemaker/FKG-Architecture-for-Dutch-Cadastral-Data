@@ -402,7 +402,7 @@
 
         async function loadServices() {
             try {
-                const response = await fetch(`${API_BASE}/services`);
+                const response = await fetch(`${API_BASE}/services/all`);
                 services = await response.json();
                 renderServices();
                 updateServiceSelect();
