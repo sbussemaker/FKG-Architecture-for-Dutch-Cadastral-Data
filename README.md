@@ -231,7 +231,7 @@ python orchestrator.py
 
 The orchestrator will:
 - Build all MCP server images (including agent service)
-- Start Flask API on port 5000
+- Start FastAPI server on port 5000 (Swagger UI at `/docs`)
 - Load Azure OpenAI credentials from `.env` file
 - Enable logging to `/tmp/orchestrator.log`
 
@@ -382,6 +382,28 @@ The Netherlands uses:
 - **BRK (Basisregistratie Kadaster)**: Cadastral registry
 - **RD coordinates**: Rijksdriehoekscoördinaten coordinate system
 - **Linked Data**: Many Dutch government datasets are available as RDF
+
+## Debugging with MCP Inspector
+
+The [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) provides an interactive UI for testing and debugging MCP servers.
+
+```bash
+# Inspect any service locally
+./scripts/inspect-mcp.sh kadaster-service
+./scripts/inspect-mcp.sh cbs-service
+./scripts/inspect-mcp.sh rijkswaterstaat-service
+
+# Inspect via Docker (container must be running)
+./scripts/inspect-mcp.sh kadaster-service --docker
+
+# Inspect agent-service (requires .env with Azure credentials)
+./scripts/inspect-mcp.sh agent-service
+```
+
+The Inspector opens a web UI at `http://localhost:5173` where you can:
+- Browse available tools and their JSON schemas
+- Execute tools with custom arguments
+- View server logs and notifications in real-time
 
 ## API Endpoints
 
