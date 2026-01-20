@@ -82,7 +82,7 @@ SERVICES: dict[str, ServiceConfig] = {
         "container_name": "eai-bag-service",
         "status": "stopped",
         "rdf_entities": ["Address", "Building"],
-        "position": {"x": 50, "y": 50},
+        "position": {"x": 50, "y": 0},
     },
     "bgt-service": {
         "name": "bgt-service",
@@ -94,7 +94,7 @@ SERVICES: dict[str, ServiceConfig] = {
         "container_name": "eai-bgt-service",
         "status": "stopped",
         "rdf_entities": ["TopographicArea", "Road", "WaterBody"],
-        "position": {"x": 50, "y": 550},
+        "position": {"x": 50, "y": 500},
     },
     "brt-service": {
         "name": "brt-service",
@@ -106,7 +106,7 @@ SERVICES: dict[str, ServiceConfig] = {
         "container_name": "eai-brt-service",
         "status": "stopped",
         "rdf_entities": ["GeographicName", "AdministrativeBoundary", "LandscapeFeature"],
-        "position": {"x": 50, "y": 300},
+        "position": {"x": 50, "y": 250},
     },
     "cbs-service": {
         "name": "cbs-service",
@@ -118,7 +118,7 @@ SERVICES: dict[str, ServiceConfig] = {
         "container_name": "eai-cbs-service",
         "status": "stopped",
         "rdf_entities": ["Municipality", "Statistics"],
-        "position": {"x": 550, "y": 50},
+        "position": {"x": 550, "y": 0},
     },
     "rijkswaterstaat-service": {
         "name": "rijkswaterstaat-service",
@@ -130,7 +130,7 @@ SERVICES: dict[str, ServiceConfig] = {
         "container_name": "eai-rijkswaterstaat-service",
         "status": "stopped",
         "rdf_entities": ["Infrastructure", "WaterBody", "Road"],
-        "position": {"x": 550, "y": 300},
+        "position": {"x": 550, "y": 250},
     },
     "agent-service": {
         "name": "agent-service",
@@ -142,7 +142,7 @@ SERVICES: dict[str, ServiceConfig] = {
         "container_name": "eai-agent-service",
         "status": "stopped",
         "rdf_entities": ["Agent"],
-        "position": {"x": 300, "y": 300},
+        "position": {"x": 300, "y": 250},
         "is_agent": True,
     },
 }

@@ -52,7 +52,7 @@
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            min-height: 1000px;
+            min-height: 850px;
         }
 
         .view-title {
@@ -341,7 +341,7 @@
                         <select id="tool-select">
                             <option value="">Select a tool...</option>
                         </select>
-                        <div id="tool-description" style="font-size: 11px; color: #4a5568; padding: 8px; background: #f7fafc; border-radius: 4px; max-height: 80px; overflow-y: auto; line-height: 1.4;">Select a tool to see its description</div>
+                        <div id="tool-description" style="font-size: 11px; color: #4a5568; padding: 8px; background: #f7fafc; border-radius: 4px; max-height: 160px; overflow-y: auto; line-height: 1.4;">Select a tool to see its description</div>
                         <textarea id="args-input" placeholder='Arguments (JSON): {"query": "Amsterdam"} or {"location_id": "LOC001"}' style="width: 100%; min-height: 60px; padding: 8px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 12px; font-family: monospace; resize: vertical;"></textarea>
                         <button class="btn-query" onclick="executeQuery()">Execute Query</button>
                     </div>
@@ -608,7 +608,7 @@
                 });
                 const result = await response.json();
                 console.log('Start result:', result);
-                setTimeout(loadServices, 1500);
+                setTimeout(() => loadServices(true), 1500);
             } catch (error) {
                 console.error('Error starting service:', error);
             }
@@ -621,7 +621,7 @@
                 });
                 const result = await response.json();
                 console.log('Stop result:', result);
-                setTimeout(loadServices, 1000);
+                setTimeout(() => loadServices(true), 1000);
             } catch (error) {
                 console.error('Error stopping service:', error);
             }
@@ -633,7 +633,7 @@
             const toolDescription = document.getElementById('tool-description');
             const currentValue = select.value; // Preserve current selection
             const currentTool = toolSelect.value; // Preserve tool selection
-            const currentDescription = toolDescription ? toolDescription.textContent : ''; // Preserve description
+            const currentDescription = toolDescription ? toolDescription.innerHTML : ''; // Preserve formatted description
 
             select.innerHTML = '<option value="">Select a service...</option>';
             services.forEach(service => {
@@ -652,9 +652,9 @@
             if (currentValue && serviceTools[currentValue]) {
                 populateToolSelect(currentValue, true); // skipDescriptionReset = true
                 toolSelect.value = currentTool; // Restore tool selection
-                // Restore description if a tool was selected
+                // Restore formatted description if a tool was selected
                 if (currentTool && currentDescription && toolDescription) {
-                    toolDescription.textContent = currentDescription;
+                    toolDescription.innerHTML = currentDescription;
                 }
             }
         }
@@ -687,6 +687,29 @@
             document.getElementById('args-input').value = '';
         });
 
+        // Format tool description with line breaks and bold section headers
+        function formatToolDescription(description) {
+            if (!description) return 'No description available';
+
+            // Escape HTML to prevent XSS
+            let formatted = description
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            // Add line breaks before section keywords and make them bold
+            const sections = ['PREREQUISITE:', 'USE THIS TOOL WHEN:', 'RETURNS:', 'DATA SEMANTICS:', 'EXAMPLE:', 'NOTE:', 'IMPORTANT:'];
+            sections.forEach(section => {
+                const regex = new RegExp(`(${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'g');
+                formatted = formatted.replace(regex, `<br><br><strong>$1</strong>`);
+            });
+
+            // Remove leading <br> tags if the description starts with a section
+            formatted = formatted.replace(/^(<br>)+/, '');
+
+            return formatted;
+        }
+
         document.getElementById('tool-select').addEventListener('change', (e) => {
             const selected = e.target.selectedOptions[0];
             const toolDescription = document.getElementById('tool-description');
@@ -701,11 +724,11 @@
                 }
             }
 
-            // Update tool description
+            // Update tool description with formatting
             if (toolDescription && selected && selected.dataset.description) {
-                toolDescription.textContent = selected.dataset.description;
+                toolDescription.innerHTML = formatToolDescription(selected.dataset.description);
             } else if (toolDescription) {
-                toolDescription.textContent = 'No description available';
+                toolDescription.innerHTML = 'No description available';
             }
         });
 
