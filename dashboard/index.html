@@ -516,17 +516,70 @@
             const boxes = document.querySelectorAll('.service-box');
             const agentBox = boxes[agentService.index];
 
+            // Helper function to find intersection point on rectangle edge
+            function getEdgeIntersection(rect, centerX, centerY, targetX, targetY, containerRect) {
+                const left = rect.left - containerRect.left;
+                const right = rect.right - containerRect.left;
+                const top = rect.top - containerRect.top;
+                const bottom = rect.bottom - containerRect.top;
+                const cx = left + rect.width / 2;
+                const cy = top + rect.height / 2;
+
+                const dx = targetX - cx;
+                const dy = targetY - cy;
+
+                if (dx === 0 && dy === 0) return { x: cx, y: cy };
+
+                const halfWidth = rect.width / 2;
+                const halfHeight = rect.height / 2;
+
+                // Calculate intersection with each edge and find the closest one
+                let t = Infinity;
+
+                // Right edge
+                if (dx > 0) {
+                    const tRight = halfWidth / dx;
+                    if (Math.abs(dy * tRight) <= halfHeight) t = Math.min(t, tRight);
+                }
+                // Left edge
+                if (dx < 0) {
+                    const tLeft = -halfWidth / dx;
+                    if (Math.abs(dy * tLeft) <= halfHeight) t = Math.min(t, tLeft);
+                }
+                // Bottom edge
+                if (dy > 0) {
+                    const tBottom = halfHeight / dy;
+                    if (Math.abs(dx * tBottom) <= halfWidth) t = Math.min(t, tBottom);
+                }
+                // Top edge
+                if (dy < 0) {
+                    const tTop = -halfHeight / dy;
+                    if (Math.abs(dx * tTop) <= halfWidth) t = Math.min(t, tTop);
+                }
+
+                return { x: cx + dx * t, y: cy + dy * t };
+            }
+
             // Draw lines from each data service to the agent
             dataServices.forEach(({service, index}) => {
                 const dataBox = boxes[index];
                 const dataBounds = dataBox.getBoundingClientRect();
                 const agentBounds = agentBox.getBoundingClientRect();
 
-                // Calculate connection points (bottom of data service to top of agent)
-                const x1 = dataBounds.left + dataBounds.width / 2 - containerRect.left;
-                const y1 = dataBounds.bottom - containerRect.top;
-                const x2 = agentBounds.left + agentBounds.width / 2 - containerRect.left;
-                const y2 = agentBounds.top - containerRect.top;
+                // Calculate centers
+                const dataCenterX = dataBounds.left + dataBounds.width / 2 - containerRect.left;
+                const dataCenterY = dataBounds.top + dataBounds.height / 2 - containerRect.top;
+                const agentCenterX = agentBounds.left + agentBounds.width / 2 - containerRect.left;
+                const agentCenterY = agentBounds.top + agentBounds.height / 2 - containerRect.top;
+
+                // Find edge intersection points (shortest path between boxes)
+                const dataEdge = getEdgeIntersection(dataBounds, dataCenterX, dataCenterY, agentCenterX, agentCenterY, containerRect);
+                const agentEdge = getEdgeIntersection(agentBounds, agentCenterX, agentCenterY, dataCenterX, dataCenterY, containerRect);
+
+                const x1 = dataEdge.x;
+                const y1 = dataEdge.y;
+                const x2 = agentEdge.x;
+                const y2 = agentEdge.y;
 
                 const line = document.createElement('div');
                 line.className = 'connection-line';

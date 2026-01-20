@@ -94,7 +94,7 @@ SERVICES: dict[str, ServiceConfig] = {
         "container_name": "eai-bgt-service",
         "status": "stopped",
         "rdf_entities": ["TopographicArea", "Road", "WaterBody"],
-        "position": {"x": 300, "y": 50},
+        "position": {"x": 50, "y": 550},
     },
     "brt-service": {
         "name": "brt-service",
