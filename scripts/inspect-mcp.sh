@@ -4,10 +4,10 @@
 
 set -e
 
-SERVICE=${1:-kadaster-service}
+SERVICE=${1:-bag-service}
 MODE=${2:-local}
 
-VALID_SERVICES=("kadaster-service" "cbs-service" "rijkswaterstaat-service" "agent-service")
+VALID_SERVICES=("bag-service" "brt-service" "bgt-service" "cbs-service" "rijkswaterstaat-service" "agent-service")
 
 if [[ ! " ${VALID_SERVICES[@]} " =~ " ${SERVICE} " ]]; then
     echo "Error: Invalid service '${SERVICE}'"
