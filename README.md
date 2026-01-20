@@ -3,12 +3,15 @@
 > [!NOTE]
 > This demo is made as part of the course "Architectures of Information Systems" 2025, taught by University of Twente. The architecture of this project (Archi model) is found at https://github.com/sbussemaker/2526-AIS-Group-9.
 
-A demonstration project showcasing Enterprise Architecture Integration (EAI) using Dutch government data sources:
-- **Kadaster** (Dutch Land Registry) - Cadastral and property data
+A demonstration project showcasing Enterprise Architecture Integration (EAI) using Dutch government data sources from three organizations:
+- **Kadaster** (Dutch Land Registry) - Cadastral and property data via three key registers:
+  - BAG (Basisregistratie Adressen en Gebouwen) - Building and address data
+  - BGT (Basisregistratie Grootschalige Topografie) - Large-scale topography
+  - BRT (Basisregistratie Topografie) - Topographic data
 - **CBS** (Statistics Netherlands) - Demographic and statistical data
 - **Rijkswaterstaat** (Ministry of Infrastructure) - Infrastructure and water management data
 
-This demo illustrates how three independent government agencies can share complementary data about the same geographic locations using:
+This demo illustrates how three independent government agencies can share complementary data about the same geographic locations through five MCP services using:
 - **ArchiMate** for visual modeling
 - **MCP (Model Context Protocol)** for service communication
 - **RDF/JSON-LD** for semantic interoperability
@@ -36,38 +39,41 @@ python -m http.server 8080
 ## Architecture Overview
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│         HTML Dashboard (ArchiMate View)                        │
-│  ┌──────────┐    ┌──────────┐    ┌──────────────────┐          │
-│  │ Kadaster │───→│   CBS    │───→│ Rijkswaterstaat  │          │
-│  │  (Land   │    │  (Stats) │    │ (Infrastructure) │          │
-│  │ Registry)│    │          │    │  & Water Mgmt    │          │
-│  └──────────┘    └──────────┘    └──────────────────┘          │
-│        ↓               ↓                   ↓                   │
-│        └───────────────┴───────────────────┘                   │
-│                        │                                       │
-│                  RDF Data Flows                                │
-└────────────────────────┬───────────────────────────────────────┘
-                         │
-                         ↓
-                ┌────────────────┐
-                │   MCP Client   │
-                │  (Orchestrator)│
-                └────────────────┘
-                         │
-        ┌────────────────┼─────────────────┐
-        ↓                ↓                 ↓
-┌─────────────┐   ┌─────────────┐   ┌──────────────────┐
-│ MCP Server  │   │ MCP Server  │   │ MCP Server       │
-│ (Kadaster)  │   │   (CBS)     │   │(Rijkswaterstaat) │
-│ + RDF Store │   │ + RDF Store │   │  + RDF Store     │
-└─────────────┘   └─────────────┘   └──────────────────┘
- Docker Container   Docker Container  Docker Container
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                        HTML Dashboard (ArchiMate View)                           │
+│  ┌─────────────────────────────────────────┐                                     │
+│  │              Kadaster                   │                                     │
+│  │  ┌───────┐   ┌───────┐   ┌───────┐      │   ┌───────┐   ┌──────────────────┐  │
+│  │  │  BAG  │   │  BGT  │   │  BRT  │      │   │  CBS  │   │ Rijkswaterstaat  │  │
+│  │  │(Addr.)│   │(Topo) │   │(Topo) │      │   │(Stats)│   │ (Infrastructure) │  │
+│  │  └───────┘   └───────┘   └───────┘      │   └───────┘   └──────────────────┘  │
+│  └─────────────────────────────────────────┘        │               │            │
+│        │             │            │                 │               │            │
+│        └─────────────┴────────────┴─────────────────┴───────────────┘            │
+│                                    │                                             │
+│                              RDF Data Flows                                      │
+└────────────────────────────────────┬─────────────────────────────────────────────┘
+                                     │
+                                     ↓
+                            ┌────────────────┐
+                            │   MCP Client   │
+                            │  (Orchestrator)│
+                            └────────────────┘
+                                     │
+        ┌──────────────┬─────────────┼─────────────┬──────────────┐
+        ↓              ↓             ↓             ↓              ↓
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌──────────────────┐
+│ MCP Server  │ │ MCP Server  │ │ MCP Server  │ │ MCP Server  │ │ MCP Server       │
+│    (BAG)    │ │    (BGT)    │ │    (BRT)    │ │    (CBS)    │ │(Rijkswaterstaat) │
+│ + RDF Store │ │ + RDF Store │ │ + RDF Store │ │ + RDF Store │ │  + RDF Store     │
+└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └──────────────────┘
+    Docker          Docker          Docker          Docker           Docker
+  Container       Container       Container       Container        Container
 ```
 
 ## Shared Geospatial Ontology
 
-All three services share a common RDF ontology (`ontology/geospatial.ttl`) with:
+All five services share a common RDF ontology (`ontology/geospatial.ttl`) with:
 
 **Classes:**
 - Location, Property, Municipality, Province
@@ -82,7 +88,7 @@ All three services share a common RDF ontology (`ontology/geospatial.ttl`) with:
 
 ## Sample Data
 
-All three services contain data about the same three locations:
+All five services contain data about the same three locations:
 
 ### LOC001 - Amsterdam (Damrak 1)
 - **Kadaster**: Cadastral ID AMS01-G-1234, 450.5 m², owned by Gemeente Amsterdam, office building from 1920
@@ -119,26 +125,71 @@ See [AGENTS.md](AGENTS.md) for detailed documentation.
 
 ## MCP Services
 
-### 1. Kadaster Service (Dutch Land Registry)
+### 1. BAG Service (Addresses & Buildings)
 
-**Purpose**: Cadastral data, property ownership, and building information
+**Purpose**: Official Dutch address and building registration data from Kadaster
 
 **Tools:**
-- `list_properties`: Get all registered properties
-- `get_property`: Get detailed cadastral information by location ID
+- `find_address`: Search by street name, city, or postal code
+- `get_building`: Get building details (purpose, construction year, surface area)
+- `get_address`: Get full address details by location ID
+- `list_addresses`: List all registered addresses
 
-**RDF Entities**: Property, Location, Building
+**RDF Entities**: Address, Building
 
 **Sample Query:**
 ```json
 {
-  "service": "kadaster-service",
-  "tool": "get_property",
+  "service": "bag-service",
+  "tool": "get_building",
   "arguments": {"location_id": "LOC001"}
 }
 ```
 
-### 2. CBS Service (Statistics Netherlands)
+### 2. BGT Service (Large-Scale Topography)
+
+**Purpose**: Large-scale topographic data (1:500-1:5000) including roads, water, and terrain from Kadaster
+
+**Tools:**
+- `find_area`: Search topographic features by name or type
+- `get_terrain`: Get complete topographic info for a location
+- `get_roads`: Get road infrastructure details
+- `get_water`: Get water body information
+
+**RDF Entities**: TopographicArea, Road, WaterBody
+
+**Sample Query:**
+```json
+{
+  "service": "bgt-service",
+  "tool": "get_terrain",
+  "arguments": {"location_id": "LOC001"}
+}
+```
+
+### 3. BRT Service (Topographic Maps)
+
+**Purpose**: Topographic map data (1:10,000+) including place names, boundaries, and landscape features from Kadaster
+
+**Tools:**
+- `find_place`: Search by place name, type, or location ID
+- `get_boundaries`: Get administrative boundaries (municipality, province, water board)
+- `get_place_names`: Get geographic names for a location
+- `get_landscape`: Get landscape features (parks, forests)
+- `list_municipalities`: List all municipalities
+
+**RDF Entities**: GeographicName, AdministrativeBoundary, LandscapeFeature
+
+**Sample Query:**
+```json
+{
+  "service": "brt-service",
+  "tool": "get_boundaries",
+  "arguments": {"location_id": "LOC001"}
+}
+```
+
+### 4. CBS Service (Statistics Netherlands)
 
 **Purpose**: Demographic data and statistical information
 
@@ -158,7 +209,7 @@ See [AGENTS.md](AGENTS.md) for detailed documentation.
 }
 ```
 
-### 3. Rijkswaterstaat Service (Infrastructure & Water Management)
+### 5. Rijkswaterstaat Service (Infrastructure & Water Management)
 
 **Purpose**: Infrastructure, roads, bridges, and water management data
 
@@ -186,8 +237,12 @@ ais/
 │   └── geospatial.ttl           # Shared RDF geospatial ontology
 ├── mcp-servers/
 │   ├── Dockerfile.shared        # Shared distroless Docker image
-│   ├── kadaster-service/
-│   │   └── server.py            # Kadaster MCP server
+│   ├── bag-service/
+│   │   └── server.py            # BAG (Addresses & Buildings) MCP server
+│   ├── bgt-service/
+│   │   └── server.py            # BGT (Large-Scale Topography) MCP server
+│   ├── brt-service/
+│   │   └── server.py            # BRT (Topographic Maps) MCP server
 │   ├── cbs-service/
 │   │   └── server.py            # CBS MCP server
 │   └── rijkswaterstaat-service/
@@ -251,7 +306,7 @@ Navigate to `http://localhost:8080`
 ### 5. Start Services
 
 From the dashboard:
-1. Click "Start" on each service box (Kadaster, CBS, Rijkswaterstaat)
+1. Click "Start" on each service box (BAG, BGT, BRT, CBS, Rijkswaterstaat)
 2. Wait for services to show "running" status (green)
 3. Connection lines will become active when all services are running
 
@@ -281,23 +336,37 @@ python test_agent.py
 
 ### Cross-Agency Data Integration
 
-Query all three agencies for complementary data about the same location:
+Query all three agencies (via five services) for complementary data about the same location:
 
-**1. Get property details from Kadaster:**
+**1. Get building details from BAG (Kadaster):**
 ```json
-Service: Kadaster
-Tool: get_property
+Service: BAG
+Tool: get_building
 Arguments: {"location_id": "LOC002"}
 ```
 
-**2. Get demographic statistics from CBS:**
+**2. Get topographic data from BGT (Kadaster):**
+```json
+Service: BGT
+Tool: get_terrain
+Arguments: {"location_id": "LOC002"}
+```
+
+**3. Get administrative boundaries from BRT (Kadaster):**
+```json
+Service: BRT
+Tool: get_boundaries
+Arguments: {"location_id": "LOC002"}
+```
+
+**4. Get demographic statistics from CBS:**
 ```json
 Service: CBS
 Tool: get_statistics
 Arguments: {"location_id": "LOC002"}
 ```
 
-**3. Get infrastructure details from Rijkswaterstaat:**
+**5. Get infrastructure details from Rijkswaterstaat:**
 ```json
 Service: Rijkswaterstaat
 Tool: get_infrastructure
@@ -305,17 +374,22 @@ Arguments: {"location_id": "LOC002"}
 ```
 
 Now you have a complete picture of Utrecht (Oudegracht 231):
-- **Legal**: University property, 320 m², built 1636
+- **Building**: Education building, 3200 m², built 1636
+- **Topography**: Urban center with brick surface, Oudegracht canal nearby
+- **Administrative**: Utrecht municipality, De Stichtse Rijnlanden water board
 - **Demographics**: City of 361,966 people with avg income €35,200
 - **Infrastructure**: Weerdsluis lock, Oudegracht canal, A12 highway access
 
 ### Listing All Data
 
-Get overview from each agency:
+Get overview from each service:
 
 ```json
-// Kadaster - All properties
-{"service": "kadaster-service", "tool": "list_properties", "arguments": {}}
+// BAG - All addresses
+{"service": "bag-service", "tool": "list_addresses", "arguments": {}}
+
+// BRT - All municipalities
+{"service": "brt-service", "tool": "list_municipalities", "arguments": {}}
 
 // CBS - All locations
 {"service": "cbs-service", "tool": "list_locations", "arguments": {}}
@@ -328,7 +402,7 @@ Get overview from each agency:
 
 ### Semantic Interoperability via RDF
 
-All three services use the shared geospatial ontology, ensuring:
+All five services use the shared geospatial ontology, ensuring:
 - **Common vocabulary**: Same property names across services
 - **Linked data**: All services reference the same location IDs
 - **JSON-LD format**: Standard RDF serialization for easy parsing
@@ -343,11 +417,11 @@ All three services use the shared geospatial ontology, ensuring:
 
 ### Docker Integration
 
-All three MCP services (Kadaster, CBS, Rijkswaterstaat) share a distroless Docker image for enhanced security and reduced size:
+All five MCP services (BAG, BGT, BRT, CBS, Rijkswaterstaat) share a distroless Docker image for enhanced security and reduced size:
 - **Distroless base**: Using `gcr.io/distroless/python3-debian12` (no shell, minimal attack surface)
 - **Image size**: 91.4MB (48% smaller than standard python:3.14-slim at 177MB)
 - **Multi-stage build**: Dependencies installed in builder stage, copied to minimal runtime
-- **Shared Dockerfile**: `/mcp-servers/Dockerfile.shared` used by all three services
+- **Shared Dockerfile**: `/mcp-servers/Dockerfile.shared` used by all five services
 
 Each service runs in isolation with:
 - No exposed ports (stdio communication only)
@@ -359,10 +433,10 @@ Each service runs in isolation with:
 
 This demo illustrates:
 
-- **Application Services**: Kadaster, CBS, Rijkswaterstaat
-- **Data Objects**: Location (RDF), Property (RDF), Infrastructure (RDF)
+- **Application Services**: BAG, BGT, BRT (Kadaster), CBS, Rijkswaterstaat
+- **Data Objects**: Location (RDF), Address (RDF), Building (RDF), Infrastructure (RDF)
 - **Flow Relationships**: Geospatial data flows via RDF/JSON-LD
-- **Application Cooperation**: Three services providing complementary views of the same entities
+- **Application Cooperation**: Five services from three organizations providing complementary views of the same entities
 - **Technology Layer**: Docker, MCP, HTTP/JSON-RPC
 
 ## Real-World Relevance
@@ -377,8 +451,10 @@ This architecture mirrors actual Dutch government data integration challenges:
 
 ### Actual Dutch Data Standards
 
-The Netherlands uses:
+The Netherlands uses key registers (basisregistraties), including:
 - **BAG (Basisregistratie Adressen en Gebouwen)**: Building and address registry
+- **BGT (Basisregistratie Grootschalige Topografie)**: Large-scale topographic data
+- **BRT (Basisregistratie Topografie)**: Topographic map data
 - **BRK (Basisregistratie Kadaster)**: Cadastral registry
 - **RD coordinates**: Rijksdriehoekscoördinaten coordinate system
 - **Linked Data**: Many Dutch government datasets are available as RDF
@@ -389,12 +465,14 @@ The [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) provid
 
 ```bash
 # Inspect any service locally
-./scripts/inspect-mcp.sh kadaster-service
+./scripts/inspect-mcp.sh bag-service
+./scripts/inspect-mcp.sh bgt-service
+./scripts/inspect-mcp.sh brt-service
 ./scripts/inspect-mcp.sh cbs-service
 ./scripts/inspect-mcp.sh rijkswaterstaat-service
 
 # Inspect via Docker (container must be running)
-./scripts/inspect-mcp.sh kadaster-service --docker
+./scripts/inspect-mcp.sh bag-service --docker
 
 # Inspect agent-service (requires .env with Azure credentials)
 ./scripts/inspect-mcp.sh agent-service
