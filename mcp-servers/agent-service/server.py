@@ -4,7 +4,7 @@ AI Agent MCP Server
 ===================
 
 This is a meta-MCP-server that acts as both an MCP server (exposing tools to clients)
-and an MCP client (querying other MCP servers like Kadaster, CBS, Rijkswaterstaat).
+and an MCP client (querying other MCP servers like BAG, BGT, BRT, CBS, Rijkswaterstaat).
 
 It uses Azure OpenAI to understand natural language questions and intelligently query
 the appropriate backend services.
@@ -12,19 +12,23 @@ the appropriate backend services.
 Architecture:
     [Client] --> [Agent Service] --> [Azure OpenAI]
                        |
-                       +--> [Kadaster Service]
-                       +--> [CBS Service]
-                       +--> [Rijkswaterstaat Service]
+                       +--> [BAG Service] (Addresses & Buildings)
+                       +--> [BGT Service] (Large-Scale Topography)
+                       +--> [BRT Service] (Topographic Maps)
+                       +--> [CBS Service] (Statistics)
+                       +--> [Rijkswaterstaat Service] (Infrastructure & Water)
 
 Tool Chaining Workflow:
     When the agent receives a question about a location (e.g., "What is the population
     of Amsterdam?"), it follows this workflow:
 
-    1. LOCATION DISCOVERY: First calls find_location(query="Amsterdam") on one of
-       the backend services to get the location identifier (e.g., "LOC001")
+    1. LOCATION DISCOVERY: First calls a find tool (find_address in BAG, find_location
+       in CBS/RWS, find_area in BGT, find_place in BRT) to get the location identifier
 
     2. DATA RETRIEVAL: Uses the discovered location_id to query relevant services:
-       - Kadaster: get_property(location_id="LOC001") for property data
+       - BAG: get_building(location_id="LOC001") for building data
+       - BGT: get_terrain(location_id="LOC001") for topographic data
+       - BRT: get_boundaries(location_id="LOC001") for administrative boundaries
        - CBS: get_statistics(location_id="LOC001") for demographics
        - Rijkswaterstaat: get_infrastructure(location_id="LOC001") for infrastructure
 
@@ -94,12 +98,28 @@ else:
 
 # MCP service configuration
 MCP_SERVICES = {
-    "Kadaster": {
-        "container": "eai-kadaster-service",
+    "BAG": {
+        "container": "eai-bag-service",
         "description": (
-            "Query the Kadaster (Dutch Land Registry) for property ownership, "
-            "cadastral data, building information. Use for questions about "
-            "properties, owners, buildings, land use."
+            "Query BAG (Basisregistratie Adressen en Gebouwen) for addresses "
+            "and buildings. Use for questions about street addresses, postal codes, "
+            "building purposes, construction years, and floor areas."
+        ),
+    },
+    "BGT": {
+        "container": "eai-bgt-service",
+        "description": (
+            "Query BGT (Basisregistratie Grootschalige Topografie) for detailed "
+            "topographic data. Use for questions about road types, surfaces, "
+            "cycleways, water features, and terrain classification."
+        ),
+    },
+    "BRT": {
+        "container": "eai-brt-service",
+        "description": (
+            "Query BRT (Basisregistratie Topografie) for geographic names and "
+            "administrative boundaries. Use for questions about neighborhoods, "
+            "provinces, water boards, safety regions, parks, and forests."
         ),
     },
     "CBS": {
@@ -120,8 +140,8 @@ MCP_SERVICES = {
 
 # Cache for dynamically discovered tools
 # Structure: {
-#   'Kadaster': {
-#       'container': 'eai-kadaster-service',
+#   'BAG': {
+#       'container': 'eai-bag-service',
 #       'wrapper_tool': {...},
 #       'discovered_tools': [...]
 #   },
@@ -414,8 +434,15 @@ def build_tool_arguments(mcp_tool: str, tool_input: dict[str, Any]) -> dict[str,
     """
     arguments: dict[str, Any] = {}
 
-    # find_location tools use 'query' parameter
-    if mcp_tool == "find_location":
+    # Discovery tools use 'query' parameter
+    # - BAG: find_address
+    # - BGT: find_area
+    # - BRT: find_place
+    # - CBS: find_location
+    # - Rijkswaterstaat: find_location
+    discovery_tools = {"find_location", "find_address", "find_area", "find_place"}
+
+    if mcp_tool in discovery_tools:
         if "query" in tool_input:
             arguments["query"] = tool_input["query"]
         else:
@@ -497,23 +524,30 @@ def ask_question(question: str) -> str:
             "role": "system",
             "content": (
                 "You are an expert assistant with access to Dutch geospatial data "
-                "from three government agencies:\n"
-                "- Kadaster (Land Registry): Property ownership, cadastral data, buildings\n"
-                "- CBS (Statistics Netherlands): Demographics, population, income statistics\n"
-                "- Rijkswaterstaat (Infrastructure & Water): Roads, bridges, canals, "
-                "water levels\n\n"
+                "from five government data sources:\n"
+                "- BAG (Addresses & Buildings): Street addresses, postal codes, building "
+                "purposes, construction years, floor areas\n"
+                "- BGT (Large-Scale Topography): Road types, surfaces, cycleways, water "
+                "features, terrain classification\n"
+                "- BRT (Topographic Maps): Geographic names, neighborhoods, provinces, "
+                "water boards, safety regions, parks, forests\n"
+                "- CBS (Statistics Netherlands): Demographics, population, income, "
+                "unemployment rates\n"
+                "- Rijkswaterstaat (Infrastructure & Water): Highways, bridges, tunnels, "
+                "canals, water levels\n\n"
                 "LOCATION DISCOVERY WORKFLOW (MANDATORY):\n"
                 "When a user asks about a location (city, address, etc.), you MUST:\n"
-                "1. FIRST call find_location with the location name to get the location ID\n"
-                "   Example: To find Amsterdam, call the Kadaster tool with "
-                '{"tool": "find_location", "query": "Amsterdam"}\n'
+                "1. FIRST call a find tool (find_address in BAG, find_location in CBS/RWS, "
+                "find_area in BGT, find_place in BRT) to get the location ID\n"
+                "   Example: To find Amsterdam, call the BAG tool with "
+                '{"tool": "find_address", "query": "Amsterdam"}\n'
                 "2. Extract the locationId from the response (e.g., 'LOC001')\n"
                 "3. THEN use that locationId with other tools to get detailed data\n"
                 "   Example: Call CBS with "
                 '{"tool": "get_statistics", "location_id": "LOC001"}\n\n'
-                "Each service has its own find_location tool that returns location IDs.\n"
-                "The locationId is SHARED across all services - LOC001 in Kadaster refers "
-                "to the same place as LOC001 in CBS and Rijkswaterstaat.\n\n"
+                "Each service has its own discovery tool that returns location IDs.\n"
+                "The locationId is SHARED across all services - LOC001 in BAG refers "
+                "to the same place as LOC001 in CBS, BGT, BRT, and Rijkswaterstaat.\n\n"
                 "CRITICAL RULES:\n"
                 "1. You MUST use find_location FIRST to discover location IDs\n"
                 "2. You MUST NOT assume or hardcode location IDs\n"
@@ -542,7 +576,7 @@ def ask_question(question: str) -> str:
         {"role": "user", "content": question},
     ]
 
-    max_iterations = 5
+    max_iterations = 20
     iteration = 0
 
     while iteration < max_iterations:
@@ -653,7 +687,7 @@ def handle_request(request):
                 "serverInfo": {
                     "name": "agent-service",
                     "version": "1.0.0",
-                    "description": "AI Agent that queries Kadaster, CBS, and Rijkswaterstaat",
+                    "description": "AI Agent that queries BAG, BGT, BRT, CBS, and Rijkswaterstaat",
                 },
             },
         }
@@ -668,7 +702,7 @@ def handle_request(request):
                         "name": "ask_question",
                         "description": (
                             "Ask a natural language question about Dutch locations. "
-                            "The agent will intelligently query Kadaster, CBS, and "
+                            "The agent will intelligently query BAG, BGT, BRT, CBS, and "
                             "Rijkswaterstaat services and synthesize a comprehensive answer."
                         ),
                         "inputSchema": {
