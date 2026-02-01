@@ -10,7 +10,7 @@ Purpose:
     Provides data on Dutch national infrastructure including highways (Rijkswegen),
     bridges, tunnels, locks, canals, rivers, and water level measurements.
 
-Ontology (RDF Namespace: http://example.org/geospatial#):
+Ontology (RDF Namespace: http://imx-geo-prime.org/geospatial#):
     - geo:Location: Geographic location with administrative data
         - geo:locationId: Unique identifier (e.g., "LOC001")
         - geo:municipality: Municipality/city name
@@ -64,7 +64,7 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS, XSD
 
 # Define namespace
-GEO = Namespace("http://example.org/geospatial#")
+GEO = Namespace("http://imx-geo-prime.org/geospatial#")
 
 # Initialize in-memory RDF graph
 graph = Graph()
@@ -82,7 +82,7 @@ def init_data():
     ]
 
     for loc_id, municipality, province in locations:
-        location_uri = URIRef(f"http://example.org/locations/{loc_id}")
+        location_uri = URIRef(f"http://imx-geo-prime.org/locations/{loc_id}")
         graph.add((location_uri, RDF.type, GEO.Location))
         graph.add((location_uri, GEO.locationId, Literal(loc_id)))
         graph.add((location_uri, GEO.municipality, Literal(municipality)))
@@ -113,7 +113,7 @@ def init_data():
     ]
 
     for loc_id, infra_id, infra_type, condition, managed, description in infrastructure:
-        infra_uri = URIRef(f"http://example.org/infrastructure/{infra_id}")
+        infra_uri = URIRef(f"http://imx-geo-prime.org/infrastructure/{infra_id}")
 
         graph.add((infra_uri, RDF.type, GEO.Infrastructure))
         graph.add((infra_uri, GEO.locationId, Literal(loc_id)))
@@ -123,7 +123,7 @@ def init_data():
         graph.add((infra_uri, RDFS.label, Literal(description)))
 
     for loc_id, water_id, water_type, level, managed, name in water_bodies:
-        water_uri = URIRef(f"http://example.org/water/{water_id}")
+        water_uri = URIRef(f"http://imx-geo-prime.org/water/{water_id}")
 
         graph.add((water_uri, RDF.type, GEO.WaterBody))
         graph.add((water_uri, GEO.locationId, Literal(loc_id)))
@@ -133,7 +133,7 @@ def init_data():
         graph.add((water_uri, RDFS.label, Literal(name)))
 
     for loc_id, road_id, road_type, road_num, max_speed, condition in roads:
-        road_uri = URIRef(f"http://example.org/roads/{road_id}")
+        road_uri = URIRef(f"http://imx-geo-prime.org/roads/{road_id}")
 
         graph.add((road_uri, RDF.type, GEO.Road))
         graph.add((road_uri, GEO.locationId, Literal(loc_id)))
@@ -185,7 +185,7 @@ def find_location(query):
                 }
             )
 
-    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": results}
+    return {"@context": {"geo": "http://imx-geo-prime.org/geospatial#"}, "@graph": results}
 
 
 def get_infrastructure(location_id):
@@ -256,7 +256,7 @@ def get_infrastructure(location_id):
 
     return {
         "@context": {
-            "geo": "http://example.org/geospatial#",
+            "geo": "http://imx-geo-prime.org/geospatial#",
             "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
         },
         "geo:locationId": location_id,
@@ -284,7 +284,7 @@ def list_roads():
             }
         )
 
-    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": roads}
+    return {"@context": {"geo": "http://imx-geo-prime.org/geospatial#"}, "@graph": roads}
 
 
 def get_water_level(location_id):
@@ -299,7 +299,7 @@ def get_water_level(location_id):
 
             return {
                 "@context": {
-                    "geo": "http://example.org/geospatial#",
+                    "geo": "http://imx-geo-prime.org/geospatial#",
                     "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
                 },
                 "@id": str(water_uri),

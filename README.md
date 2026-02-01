@@ -406,7 +406,7 @@ All five services use the shared geospatial ontology, ensuring:
 - **Common vocabulary**: Same property names across services
 - **Linked data**: All services reference the same location IDs
 - **JSON-LD format**: Standard RDF serialization for easy parsing
-- **Namespace**: `http://example.org/geospatial#`
+- **Namespace**: `http://imx-geo-prime.org/geospatial#`
 
 ### MCP Protocol Communication
 

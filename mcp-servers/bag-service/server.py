@@ -10,7 +10,7 @@ Purpose:
     postal codes, building purposes, construction years, surface areas, and
     building status information.
 
-Ontology (RDF Namespace: http://example.org/geospatial#):
+Ontology (RDF Namespace: http://imx-geo-prime.org/geospatial#):
     - geo:Address: Address registration
         - geo:locationId: Unique identifier linking to other registers
         - geo:streetName: Street name
@@ -47,7 +47,7 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, XSD
 
 # Define namespace
-GEO = Namespace("http://example.org/geospatial#")
+GEO = Namespace("http://imx-geo-prime.org/geospatial#")
 
 # Initialize in-memory RDF graph
 graph = Graph()
@@ -76,7 +76,7 @@ def init_data():
     ]
 
     for loc_id, street, house_num, postal, municipality, province in addresses:
-        address_uri = URIRef(f"http://example.org/bag/addresses/{loc_id}")
+        address_uri = URIRef(f"http://imx-geo-prime.org/bag/addresses/{loc_id}")
 
         graph.add((address_uri, RDF.type, GEO.Address))
         graph.add((address_uri, GEO.locationId, Literal(loc_id)))
@@ -87,7 +87,7 @@ def init_data():
         graph.add((address_uri, GEO.province, Literal(province)))
 
     for loc_id, building_id, purpose, year, status, area, units in buildings:
-        building_uri = URIRef(f"http://example.org/bag/buildings/{building_id}")
+        building_uri = URIRef(f"http://imx-geo-prime.org/bag/buildings/{building_id}")
 
         graph.add((building_uri, RDF.type, GEO.Building))
         graph.add((building_uri, GEO.locationId, Literal(loc_id)))
@@ -134,7 +134,7 @@ def find_address(query):
                 }
             )
 
-    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": results}
+    return {"@context": {"geo": "http://imx-geo-prime.org/geospatial#"}, "@graph": results}
 
 
 def get_building(location_id):
@@ -157,7 +157,7 @@ def get_building(location_id):
             break
 
     result = {
-        "@context": {"geo": "http://example.org/geospatial#"},
+        "@context": {"geo": "http://imx-geo-prime.org/geospatial#"},
         "@id": str(building_uri),
         "@type": "geo:Building",
         "geo:locationId": location_id,
@@ -200,7 +200,7 @@ def list_addresses():
             }
         )
 
-    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": addresses}
+    return {"@context": {"geo": "http://imx-geo-prime.org/geospatial#"}, "@graph": addresses}
 
 
 def get_address(location_id):
@@ -215,7 +215,7 @@ def get_address(location_id):
         return None
 
     return {
-        "@context": {"geo": "http://example.org/geospatial#"},
+        "@context": {"geo": "http://imx-geo-prime.org/geospatial#"},
         "@id": str(address_uri),
         "@type": "geo:Address",
         "geo:locationId": location_id,

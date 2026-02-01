@@ -10,7 +10,7 @@ Purpose:
     statistics, income data, unemployment rates, and population density metrics
     for municipalities in the Netherlands.
 
-Ontology (RDF Namespace: http://example.org/geospatial#):
+Ontology (RDF Namespace: http://imx-geo-prime.org/geospatial#):
     - geo:Location: Geographic location reference
         - geo:locationId: Unique identifier (e.g., "LOC001")
         - geo:municipality: Municipality/city name
@@ -48,7 +48,7 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, XSD
 
 # Define namespace
-GEO = Namespace("http://example.org/geospatial#")
+GEO = Namespace("http://imx-geo-prime.org/geospatial#")
 
 # Initialize in-memory RDF graph
 graph = Graph()
@@ -66,8 +66,8 @@ def init_data():
     ]
 
     for loc_id, municipality, pop, households, income, density, unemployment in statistics:
-        location_uri = URIRef(f"http://example.org/locations/{loc_id}")
-        stats_uri = URIRef(f"http://example.org/statistics/{loc_id}")
+        location_uri = URIRef(f"http://imx-geo-prime.org/locations/{loc_id}")
+        stats_uri = URIRef(f"http://imx-geo-prime.org/statistics/{loc_id}")
 
         # Location data
         graph.add((location_uri, RDF.type, GEO.Location))
@@ -90,7 +90,7 @@ init_data()
 
 def get_statistics(location_id):
     """Get statistical data by location ID"""
-    stats_uri = URIRef(f"http://example.org/statistics/{location_id}")
+    stats_uri = URIRef(f"http://imx-geo-prime.org/statistics/{location_id}")
 
     # Check if statistics exist
     if (stats_uri, RDF.type, GEO.Municipality) not in graph:
@@ -105,7 +105,7 @@ def get_statistics(location_id):
     unemployment = str(graph.value(stats_uri, GEO.unemploymentRate))
 
     return {
-        "@context": {"geo": "http://example.org/geospatial#"},
+        "@context": {"geo": "http://imx-geo-prime.org/geospatial#"},
         "@id": str(stats_uri),
         "@type": "geo:Municipality",
         "geo:locationId": location_id,
@@ -136,7 +136,7 @@ def list_locations():
             }
         )
 
-    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": locations}
+    return {"@context": {"geo": "http://imx-geo-prime.org/geospatial#"}, "@graph": locations}
 
 
 def find_location(query):
@@ -160,12 +160,12 @@ def find_location(query):
                 }
             )
 
-    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": results}
+    return {"@context": {"geo": "http://imx-geo-prime.org/geospatial#"}, "@graph": results}
 
 
 def get_demographics(location_id):
     """Get detailed demographic data by location ID"""
-    stats_uri = URIRef(f"http://example.org/statistics/{location_id}")
+    stats_uri = URIRef(f"http://imx-geo-prime.org/statistics/{location_id}")
 
     if (stats_uri, RDF.type, GEO.Municipality) not in graph:
         return None
@@ -178,7 +178,7 @@ def get_demographics(location_id):
     avg_household_size = round(population / households, 2) if households > 0 else 0
 
     return {
-        "@context": {"geo": "http://example.org/geospatial#"},
+        "@context": {"geo": "http://imx-geo-prime.org/geospatial#"},
         "@id": str(stats_uri),
         "@type": "geo:Municipality",
         "geo:locationId": location_id,

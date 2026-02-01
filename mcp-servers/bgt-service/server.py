@@ -10,7 +10,7 @@ Purpose:
     water bodies, land use parcels, vegetation areas, and terrain classifications
     for locations in the Netherlands.
 
-Ontology (RDF Namespace: http://example.org/geospatial#):
+Ontology (RDF Namespace: http://imx-geo-prime.org/geospatial#):
     - geo:TopographicArea: A classified land area
         - geo:locationId: Links to BAG/BRT location identifiers
         - geo:areaId: BGT area identifier
@@ -52,7 +52,7 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, XSD
 
 # Define namespace
-GEO = Namespace("http://example.org/geospatial#")
+GEO = Namespace("http://imx-geo-prime.org/geospatial#")
 
 # Initialize in-memory RDF graph
 graph = Graph()
@@ -101,7 +101,7 @@ def init_data():
 
     # Add areas to graph
     for loc_id, area_id, area_type, surface, managed_by, area_size in areas:
-        area_uri = URIRef(f"http://example.org/bgt/areas/{area_id}")
+        area_uri = URIRef(f"http://imx-geo-prime.org/bgt/areas/{area_id}")
 
         graph.add((area_uri, RDF.type, GEO.TopographicArea))
         graph.add((area_uri, GEO.locationId, Literal(loc_id)))
@@ -113,7 +113,7 @@ def init_data():
 
     # Add roads to graph
     for loc_id, road_id, road_type, surface, road_name, managed_by in roads:
-        road_uri = URIRef(f"http://example.org/bgt/roads/{road_id}")
+        road_uri = URIRef(f"http://imx-geo-prime.org/bgt/roads/{road_id}")
 
         graph.add((road_uri, RDF.type, GEO.Road))
         graph.add((road_uri, GEO.locationId, Literal(loc_id)))
@@ -125,7 +125,7 @@ def init_data():
 
     # Add water bodies to graph
     for loc_id, water_id, water_type, water_name, managed_by, width in water_bodies:
-        water_uri = URIRef(f"http://example.org/bgt/water/{water_id}")
+        water_uri = URIRef(f"http://imx-geo-prime.org/bgt/water/{water_id}")
 
         graph.add((water_uri, RDF.type, GEO.WaterBody))
         graph.add((water_uri, GEO.locationId, Literal(loc_id)))
@@ -208,13 +208,13 @@ def find_area(query):
                 }
             )
 
-    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": results}
+    return {"@context": {"geo": "http://imx-geo-prime.org/geospatial#"}, "@graph": results}
 
 
 def get_terrain(location_id):
     """Get all topographic features for a location"""
     features = {
-        "@context": {"geo": "http://example.org/geospatial#"},
+        "@context": {"geo": "http://imx-geo-prime.org/geospatial#"},
         "geo:locationId": location_id,
         "areas": [],
         "roads": [],
@@ -292,7 +292,7 @@ def get_roads(location_id):
         return None
 
     return {
-        "@context": {"geo": "http://example.org/geospatial#"},
+        "@context": {"geo": "http://imx-geo-prime.org/geospatial#"},
         "geo:locationId": location_id,
         "@graph": roads,
     }
@@ -319,7 +319,7 @@ def get_water(location_id):
         return None
 
     return {
-        "@context": {"geo": "http://example.org/geospatial#"},
+        "@context": {"geo": "http://imx-geo-prime.org/geospatial#"},
         "geo:locationId": location_id,
         "@graph": water_bodies,
     }

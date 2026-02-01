@@ -10,7 +10,7 @@ Purpose:
     including geographic names, administrative boundaries, landscape features,
     and infrastructure networks for the Netherlands.
 
-Ontology (RDF Namespace: http://example.org/geospatial#):
+Ontology (RDF Namespace: http://imx-geo-prime.org/geospatial#):
     - geo:GeographicName: Named geographic feature
         - geo:locationId: Links to BAG/BGT location identifiers
         - geo:nameId: BRT name identifier
@@ -52,7 +52,7 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, XSD
 
 # Define namespace
-GEO = Namespace("http://example.org/geospatial#")
+GEO = Namespace("http://imx-geo-prime.org/geospatial#")
 
 # Initialize in-memory RDF graph
 graph = Graph()
@@ -119,7 +119,7 @@ def init_data():
 
     # Add names to graph
     for loc_id, name_id, place_name, place_type, language in names:
-        name_uri = URIRef(f"http://example.org/brt/names/{name_id}")
+        name_uri = URIRef(f"http://imx-geo-prime.org/brt/names/{name_id}")
 
         graph.add((name_uri, RDF.type, GEO.GeographicName))
         graph.add((name_uri, GEO.locationId, Literal(loc_id)))
@@ -130,7 +130,7 @@ def init_data():
 
     # Add boundaries to graph
     for loc_id, bound_id, municipality, province, water_board, safety_region in boundaries:
-        boundary_uri = URIRef(f"http://example.org/brt/boundaries/{bound_id}")
+        boundary_uri = URIRef(f"http://imx-geo-prime.org/brt/boundaries/{bound_id}")
 
         graph.add((boundary_uri, RDF.type, GEO.AdministrativeBoundary))
         graph.add((boundary_uri, GEO.locationId, Literal(loc_id)))
@@ -142,7 +142,7 @@ def init_data():
 
     # Add landscape features to graph
     for loc_id, feature_id, feature_type, feature_name, area in features:
-        feature_uri = URIRef(f"http://example.org/brt/features/{feature_id}")
+        feature_uri = URIRef(f"http://imx-geo-prime.org/brt/features/{feature_id}")
 
         graph.add((feature_uri, RDF.type, GEO.LandscapeFeature))
         graph.add((feature_uri, GEO.locationId, Literal(loc_id)))
@@ -203,7 +203,7 @@ def find_place(query):
                 }
             )
 
-    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": results}
+    return {"@context": {"geo": "http://imx-geo-prime.org/geospatial#"}, "@graph": results}
 
 
 def get_boundaries(location_id):
@@ -218,7 +218,7 @@ def get_boundaries(location_id):
         return None
 
     return {
-        "@context": {"geo": "http://example.org/geospatial#"},
+        "@context": {"geo": "http://imx-geo-prime.org/geospatial#"},
         "@id": str(boundary_uri),
         "@type": "geo:AdministrativeBoundary",
         "geo:locationId": location_id,
@@ -250,7 +250,7 @@ def get_place_names(location_id):
         return None
 
     return {
-        "@context": {"geo": "http://example.org/geospatial#"},
+        "@context": {"geo": "http://imx-geo-prime.org/geospatial#"},
         "geo:locationId": location_id,
         "@graph": names,
     }
@@ -276,7 +276,7 @@ def get_landscape(location_id):
         return None
 
     return {
-        "@context": {"geo": "http://example.org/geospatial#"},
+        "@context": {"geo": "http://imx-geo-prime.org/geospatial#"},
         "geo:locationId": location_id,
         "@graph": features,
     }
@@ -296,7 +296,7 @@ def list_municipalities():
             }
         )
 
-    return {"@context": {"geo": "http://example.org/geospatial#"}, "@graph": municipalities}
+    return {"@context": {"geo": "http://imx-geo-prime.org/geospatial#"}, "@graph": municipalities}
 
 
 def handle_request(request):
